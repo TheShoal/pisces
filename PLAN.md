@@ -29,7 +29,7 @@ invocation and output parsing change.
 Target invocation:
 
 ```bash
-omp -p --mode json \
+pisces -p --mode json \
     --model=<model> \
     [--resume <session-id>] \
     --no-title \
@@ -57,7 +57,7 @@ omp -p --mode json \
 
 ### The session finalization bug (critical)
 
-When `omp -p` exits, the session JSONL is left as a `.tmp` file
+When `pisces -p` exits, the session JSONL is left as a `.tmp` file
 (`.<timestamp>_<id>.jsonl.<suffix>.tmp`). The atomic rename to the final
 `.jsonl` path is an async operation that doesn't complete before process exit.
 
@@ -82,34 +82,55 @@ and fail fast with a clear error if no model config is found.
 
 ### P0 — Required for lobster-party integration
 
-#### 1. Fix session persistence in `-p` print mode
+#### 1. Fix session writer drain in `-p` print mode
 
 **File:** `packages/coding-agent/src/modes/print-mode.ts`
 
-After the final turn completes and before `session.dispose()`, ensure the
-session storage is flushed and the `.tmp` file is renamed to its final `.jsonl`
-path. The session `id` must be in the final path so `--resume <id>` can find it.
+**Corrected understanding:** The session file is already named `<timestamp>_<id>.jsonl`
+from creation — there is no `.tmp` → `.jsonl` rename in the normal write path.
+The `.tmp` pattern only appears inside `#writeEntriesAtomically` for full-file
+rewrites, which is not the append-write path used during a turn.
+
+**The actual problem:** `dispose()` calls `sessionManager.close()`, which queues
+a persist task via `#queuePersistTask`. If Bun's event loop exits before that
+queue drains, the final `fsync`/`close` of the append-writer is skipped. The
+file content may be complete but is not guaranteed to be durable.
+
+**The fix:** Verify that `await session.dispose()` in `print-mode.ts` is
+sufficient to drain the persist queue before the process exits. If Bun exits
+aggressively, add an explicit flush before dispose:
 
 ```typescript
-// Before dispose():
-await session.storage.flush()
-await session.storage.fsync()
-await session.storage.finalize()  // rename .tmp → .jsonl
+// Ensure the persist writer is flushed and closed before exit:
+await session.sessionManager.close()  // drain persist queue explicitly
+await session.dispose()               // then full dispose
 ```
 
-The `SessionStorageWriter` already has `flush()` and `fsync()`. Add a
-`finalize()` method (or expose the rename directly) so print mode can call it
-synchronously before exit.
+Add a regression test: run `pisces -p "hello"`, assert a `.jsonl` file exists
+with non-zero size within 1s of process exit.
 
-**Why this is P0:** Without it, every `-p` turn creates an orphaned `.tmp` file,
-`--resume` always fails, and lobster-loop loses conversation context across turns.
+**Why this is P0:** Without durable session files, `--resume` is unreliable and
+lobster-loop loses conversation context across turns.
 
 #### 2. Emit session file path in `agent_end` event
 
-**File:** `packages/coding-agent/src/modes/print-mode.ts` (JSON mode event emission)
+**File:** `packages/coding-agent/src/session/agent-session.ts`
 
-Add the finalized session file path to the `agent_end` JSON event:
+`agent_end` already exists as a real event type (`AgentEndEvent`, defined in
+`extensibility/extensions/types.ts`). It fires after `turn_end` when the full
+agent loop completes. Currently its shape is `{ type, messages }`.
 
+Add `sessionId` and `sessionFile` fields at the source — in `agent-session.ts`
+where the `agent_end` event is assembled and emitted — not in `print-mode.ts`.
+`print-mode.ts` already forwards all subscriber events to stdout in JSON mode,
+so no change is needed there.
+
+Target shape:
+```typescript
+{ type: "agent_end"; messages: AgentMessage[]; sessionId: string; sessionFile: string | undefined }
+```
+
+Target JSON output:
 ```json
 {
   "type": "agent_end",
@@ -119,15 +140,38 @@ Add the finalized session file path to the `agent_end` JSON event:
 }
 ```
 
-This lets lobster-loop extract the session ID without scanning the filesystem
-or relying on the first-line parse. It's the canonical handoff point.
+This lets lobster-loop extract the session ID from `agent_end` rather than
+parsing line 1. It's the canonical handoff point — fires after all turns complete
+and the session is about to close.
 
 #### 3. Fix `--mode=json` flag parsing
 
-**File:** `packages/coding-agent/src/cli/args.ts` (or wherever `--mode` is parsed)
+**File:** `packages/coding-agent/src/cli/args.ts`
 
-The `=`-style flag (`--mode=json`) silently falls through to text mode.
-`--mode json` (space) works correctly. Normalize both forms.
+The `=`-style flag (`--mode=json`) is not handled. `args.ts:71` only matches
+`arg === "--mode"` (space form). An equals-form arg like `--mode=json` falls
+through to the `!arg.startsWith("-")` branch and is pushed to `messages` —
+effectively treated as a prompt string.
+
+Fix: normalize `--mode=<value>` by splitting on the first `=` in the arg
+parsing loop. Also add an explicit error for unrecognized mode values (currently
+silently ignored, which can mask misconfiguration):
+
+```typescript
+// Normalize --mode=json → ["--mode", "json"]
+if (arg.startsWith("--mode=")) {
+  const mode = arg.slice(7)
+  if (mode === "text" || mode === "json" || mode === "rpc" || mode === "acp") {
+    result.mode = mode
+  } else {
+    process.stderr.write(`Unknown mode: ${mode}. Valid values: text, json, rpc, acp\n`)
+    process.exit(1)
+  }
+}
+```
+
+Apply the same equals-form normalization to any other flags that lobster-loop
+may pass using equals syntax.
 
 #### 4. Port `messageUser` and `memorySearch` tools to pisces extension API
 
@@ -158,7 +202,7 @@ Replace opencode-specific parsing with pisces event schema:
 | `extract_opencode_session_id` | read `.id` from first line |
 | `--format=json` | `--mode json` |
 | `--session=<id>` | `--resume <id>` |
-| `/usr/local/bin/opencode` | `/usr/local/bin/omp` (or `pisces`) |
+| `/usr/local/bin/opencode` | `/usr/local/bin/pisces` (or `omp` alias) |
 
 Pisces `turn_end` event shape (confirmed):
 ```json
@@ -213,15 +257,23 @@ Currently only a plain text message goes to stderr.
 #### 9. `--agent <name>` flag
 
 oh-my-pi has the concept of bundled agents (explore, plan, reviewer, etc.).
-Add a `--agent` flag to `omp -p` that selects which agent runs, matching
+Add a `--agent` flag to `pisces -p` that selects which agent runs, matching
 opencode's `--agent=<name>` interface. This lets lobster-loop select the
 `lobster-runtime` agent persona by name, not just by system prompt content.
 
-#### 10. Rename binary to `pisces` (optional / cosmetic)
+#### 10. Rename binary to `pisces`
 
-If we want a clean break: rename the `omp` CLI binary to `pisces`. Affects
-`package.json` bin entry and sandbox rootfs install path. Keep `omp` as an alias.
-Not strictly required — lobster-loop can invoke either name.
+Rename the primary CLI binary from `omp` to `pisces`. Keep `omp` as a symlink
+alias for backward compatibility.
+
+**Files:**
+- `packages/coding-agent/package.json` — add `"pisces"` to `bin`, keep `"omp"` as alias
+- Sandbox rootfs install script — install `pisces` as primary, symlink `omp → pisces`
+- `lobster-party/cmd/lobster-loop/src/pisces_runtime.rs` — invoke `pisces` (not `omp`)
+
+**Decision:** Rename to `pisces`. `omp` stays as a symlink. Not a P0 blocker —
+lobster-loop can invoke either name — but land this alongside the binary swap
+for a clean cutover.
 
 ---
 
@@ -282,11 +334,12 @@ file or env vars. This means:
 
 ### `pisces.json` config file
 
-pisces inherits `opencode.json` schema but extends it:
+pisces inherits `opencode.json` schema but extends it. Omit `$schema` until a
+real schema is hosted — do not use `https://pisces.dev/config.json` (domain
+does not exist and will break validators).
 
 ```json
 {
-  "$schema": "https://pisces.dev/config.json",
   "instructions": ["..."],
   "lsp": { "enabled": false },
   "python": { "enabled": false },
@@ -296,7 +349,16 @@ pisces inherits `opencode.json` schema but extends it:
 }
 ```
 
-The lobster sandbox mounts this as a read-only config at `PISCES_CONFIG_DIR`,
+**Config file resolution order (seamless migration):**
+1. Look for `pisces.json` in `PISCES_CONFIG_DIR` / project root
+2. Fall back to `opencode.json` in the same locations
+3. Both schemas are accepted; unknown keys are ignored
+
+This means the binary swap and config rename can land in separate PRs.
+lobster-party can run opencode and pisces side-by-side during the transition,
+routing different claws to different binaries without touching shared config.
+
+The lobster sandbox mounts config as read-only at `PISCES_CONFIG_DIR`,
 exactly as `opencode.json` is today. Enabling a feature is a one-line change
 in `config/opencode-runtime/pisces.json` and a redeploy.
 
@@ -315,7 +377,7 @@ When lobster-loop invokes pisces with the same flags used for opencode today
 session semantics are identical. The only difference visible to lobster-loop
 is:
 
-1. Binary name: `omp` (or `pisces`) instead of `opencode`
+1. Binary name: `pisces` (or `omp` alias) instead of `opencode`
 2. Flag: `--mode json` instead of `--format=json`
 3. Flag: `--resume <id>` instead of `--session=<id>`
 
@@ -330,7 +392,7 @@ model invocation — is structurally the same.
 TurnRequest (gRPC)
   └─ lobster-loop (Rust)
        ├─ lookup: thread_id → latest_session_id
-       └─ sandbox spawn: omp -p --mode json
+       └─ sandbox spawn: pisces -p --mode json
                            --model=<model>
                            [--resume <session-id>]
                            --no-title
@@ -593,9 +655,8 @@ A summary of concrete work required in the shoal repo:
 
 | Change | Priority | File in pisces |
 |---|---|---|
-| Read `PISCES_MCP_SOCKETS` and register as MCP clients | P1 | `packages/coding-agent/src/main.ts` |
-| `socket_env` protocol: accept `unix://` or bare path | P1 | same |
-| `pisces.json` `[mcp]` section: named socket entries | P2 | config schema |
+| Read `PISCES_MCP_SOCKETS` (colon-delimited, no `unix://` needed), register as MCP clients; warn loudly if set but feature not active | Shoal-P1 | `packages/coding-agent/src/main.ts` |
+| `pisces.json` `[mcp]` section: named socket entries | Shoal-P2 | config schema |
 
 #### What shoal does NOT need to change
 
@@ -612,12 +673,12 @@ A summary of concrete work required in the shoal repo:
 
 | File | Change |
 |---|---|
-| `packages/coding-agent/src/modes/print-mode.ts` | P0.1: session finalization, P0.2: emit sessionFile |
-| `packages/coding-agent/src/cli/args.ts` | P0.3: `--mode=json` fix, P1.6: `--session-dir`, P1.7: `--no-provider-discovery`, P1.9: `--agent` |
-| `packages/coding-agent/src/session/session-storage.ts` | P0.1: add `finalize()` method |
+| `packages/coding-agent/src/modes/print-mode.ts` | P0.1: ensure persist queue drains before exit |
+| `packages/coding-agent/src/session/agent-session.ts` | P0.2: add `sessionId`+`sessionFile` to `agent_end` event |
+| `packages/coding-agent/src/cli/args.ts` | P0.3: `--mode=json` equals-form fix + error on unknown mode; P1.6: verify `--session-dir` wiring; P1.7: `--no-provider-discovery`; P1.9: `--agent` |
 | `packages/coding-agent/src/lobster/tools.ts` | P0.4: messageUser + memorySearch extension |
 | `packages/coding-agent/src/lobster/index.ts` | P0.4: extension loader for lobster mode |
-| `packages/coding-agent/src/main.ts` | P1.7: provider discovery flag wiring; P1: PISCES_MCP_SOCKETS |
+| `packages/coding-agent/src/main.ts` | P1.7: provider discovery flag wiring; Shoal-P1: PISCES_MCP_SOCKETS |
 
 ### In lobster-party
 
@@ -665,23 +726,17 @@ one new `src/lobster/` module) to minimize merge conflicts with upstream.
 
 ---
 
-## Open questions for next session
+## Decisions log
 
-1. Should `pisces` be the binary name or keep `omp`? (cosmetic but affects sandbox rootfs)
-2. Session chain model: store only "latest" session ID per thread, or store the
-   full chain? (Currently lobster-loop stores latest; that's sufficient for resume)
-3. Should pisces be published to npm under a `@pisces/` scope, or is a binary
-   distribution in the sandbox rootfs sufficient?
-4. Upstream oh-my-pi has an ACP mode — is there value in using ACP instead of
-   the custom lobster extension for `messageUser`? ACP already maps tool events
-   to structured session notifications, which overlaps with what messageUser does
-   for status streaming.
-5. The `pisces.json` schema extends `opencode.json` — should pisces remain
-   compatible with `opencode.json` (so existing lobster configs work without
-   renaming), or should the schema break cleanly?
-6. Shoal MCP socket injection: should `PISCES_MCP_SOCKETS` be a colon-delimited
-   list of raw Unix socket paths, or a JSON array of `{name, socket}` objects
-   so pisces can surface tool names correctly in the TUI?
-7. Should the shoal-cli pisces tool profile ship in the main repo (as an example)
-   or in a `pisces` npm package as a shoal plugin? The latter would let pisces
-   install manage its own shoal integration.
+All open questions resolved. Recorded here for traceability.
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Binary name | Rename to `pisces`; keep `omp` as symlink alias |
+| 2 | Session chain storage | Latest-only in lobster-loop; full chain reconstructable via JSONL `parentSession` links |
+| 3 | Distribution | Binary artifact only (sandbox rootfs + Artifactory if promoted to company stack); no npm publish |
+| 4 | ACP vs lobster extension for `messageUser` | Custom lobster extension for P0; revisit ACP during gRPC mode design phase |
+| 5 | `pisces.json` schema / migration | Seamless: read `pisces.json` first, fall back to `opencode.json`; accept both schemas; no `$schema` URL until hosted |
+| 6 | `PISCES_MCP_SOCKETS` format | Colon-delimited bare Unix socket paths; warn loudly if set but feature not active |
+| 7 | Shoal tool profile location | Ships in shoal repo alongside `pi.toml` / `opencode.toml` |
+| 8 | `pi-session` crate packaging | Stays inside `pi-natives` as a new module (`session_storage.rs`); not a separate addon |

@@ -1,20 +1,35 @@
 <p align="center">
-  <img src="https://github.com/can1357/oh-my-pi/blob/main/assets/hero.png?raw=true" alt="Pi Monorepo">
+  <img src="https://github.com/can1357/oh-my-pi/blob/main/assets/hero.png?raw=true" alt="Pisces">
 </p>
 
 <p align="center">
-  <strong>AI coding agent for the terminal</strong>
+  <strong>pisces — AI coding agent for headless and server use</strong>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent"><img src="https://img.shields.io/npm/v/@oh-my-pi/pi-coding-agent?style=flat&colorA=222222&colorB=CB3837" alt="npm version"></a>
-  <a href="https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-keep-E05735?style=flat&colorA=222222" alt="Changelog"></a>
-  <a href="https://github.com/can1357/oh-my-pi/actions"><img src="https://img.shields.io/github/actions/workflow/status/can1357/oh-my-pi/ci.yml?style=flat&colorA=222222&colorB=3FB950" alt="CI"></a>
-  <a href="https://github.com/can1357/oh-my-pi/blob/main/LICENSE"><img src="https://img.shields.io/github/license/can1357/oh-my-pi?style=flat&colorA=222222&colorB=58A6FF" alt="License"></a>
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&colorA=222222&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-DEA584?style=flat&colorA=222222&logo=rust&logoColor=white" alt="Rust"></a>
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/runtime-Bun-f472b6?style=flat&colorA=222222" alt="Bun"></a>
-  <a href="https://discord.gg/4NMW9cdXZa"><img src="https://img.shields.io/badge/Discord-5865F2?style=flat&colorA=222222&logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+
+<p align="center">
+  Fork of <a href="https://github.com/can1357/oh-my-pi">can1357/oh-my-pi</a> targeting first-class headless/server use.<br>
+  Primary integration target: <a href="https://github.com/usm-ricardoroche/lobster-party">lobster-party</a>.<br>
+  See <a href="PLAN.md">PLAN.md</a> and <a href="ROADMAP.md">ROADMAP.md</a> for integration status and architecture.
+</p>
+
+<blockquote>
+<strong>Binary:</strong> <code>pisces</code> (alias: <code>omp</code>)<br>
+<strong>Upstream:</strong> <a href="https://github.com/can1357/oh-my-pi">can1357/oh-my-pi</a> — sync periodically, changes scoped to <code>src/lobster/</code>, <code>src/modes/print-mode.ts</code>, <code>src/cli/args.ts</code>
+</blockquote>
+
+---
+
+<!-- Upstream oh-my-pi README follows. Feature documentation applies to pisces. -->
+<!-- CLI invocations use `pisces` (or `omp` alias). -->
+
+<p align="center">
+  <strong>AI coding agent for the terminal</strong>
 </p>
 
 <p align="center">
@@ -76,7 +91,7 @@ AI-powered conventional commit generation with intelligent change analysis:
 - **Changelog generation**: Proposes and applies changelog entries to `CHANGELOG.md` files
 - **Commit validation**: Detects filler words, meta phrases, and enforces conventional commit format
 - **Legacy mode**: `--legacy` flag for deterministic pipeline when preferred
-- Run via `omp commit` with options: `--push`, `--dry-run`, `--no-changelog`, `--context`
+- Run via `pisces commit` with options: `--push`, `--dry-run`, `--no-changelog`, `--context`
 
 ### + Python Tool (IPython Kernel)
 
@@ -94,7 +109,7 @@ Execute Python code with a persistent IPython kernel and rich helper prelude:
 - **Rich output**: Supports `display()` for HTML, Markdown, images, and interactive JSON trees
 - **Markdown rendering**: Python cell output with Markdown content renders inline
 - **Mermaid diagrams**: Renders mermaid code blocks as inline graphics in iTerm2/Kitty terminals
-- Install dependencies via `omp setup python`
+- Install dependencies via `pisces setup python`
 
 ### + LSP Integration (Language Server Protocol)
 
@@ -240,7 +255,7 @@ Full Model Context Protocol support with external tool integration:
 - **Browser server filtering**: Automatically filters browser-type MCP servers to prevent conflicts with built-in browser tool
 - **Automatic Exa filtering**: Extracts Exa API keys and prefers the native Exa integration
 - **Config schema + setup guide**: [`docs/mcp-config.md`](./docs/mcp-config.md) and [`packages/coding-agent/src/config/mcp-schema.json`](./packages/coding-agent/src/config/mcp-schema.json)
-- Plugin CLI (`omp plugin install/enable/configure/doctor`)
+- Plugin CLI (`pisces plugin install/enable/configure/doctor`)
 - Hot-loadable plugins from `~/.omp/plugins/` with npm/bun integration
 - `disabledServers` works on both project-level and user-level third-party servers
 
@@ -361,9 +376,9 @@ Supported platforms: `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, `
 
 ### ... and many more
 
-- **`omp config` subcommand**: Manage settings from CLI (`list`, `get`, `set`, `reset`, `path`)
-- **`omp setup` subcommand**: Install optional dependencies (e.g., `omp setup python` for Jupyter kernel)
-- **`omp stats` subcommand**: Local observability dashboard for AI usage (requests, cost, cache rate, tokens/s)
+- **`pisces config` subcommand**: Manage settings from CLI (`list`, `get`, `set`, `reset`, `path`)
+- **`pisces setup` subcommand**: Install optional dependencies (e.g., `pisces setup python` for Jupyter kernel)
+- **`pisces stats` subcommand**: Local observability dashboard for AI usage (requests, cost, cache rate, tokens/s)
 - **`xhigh` thinking level**: Extended reasoning for Anthropic models with increased token budgets
 - **Background mode**: `/background` detaches UI and continues agent execution
 - **Completion notifications**: Configurable bell/OSC99/OSC9 when agent finishes
@@ -383,67 +398,37 @@ Supported platforms: `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, `
 
 ## Installation
 
-### Via Bun (recommended)
+### Pisces (this fork)
 
-Requires [Bun](https://bun.sh) **>= 1.3.7**:
+Pisces is distributed as a binary artifact. Install instructions depend on your
+deployment target:
+
+- **Lobster sandbox:** The sandbox rootfs installs `pisces` automatically. See
+  `config/opencode-runtime/` in lobster-party for the install path.
+- **Developer machine (shoal/interactive use):** Build from source:
+  ```bash
+  git clone https://github.com/usm-ricardoroche/pisces
+  cd pisces
+  bun install
+  bun run build
+  # Binary at packages/coding-agent/dist/pisces (omp symlink created automatically)
+  ```
+- **Company artifact registry:** Artifactory distribution planned if pisces is
+  promoted to company tech stack. Instructions TBD.
+
+### Upstream oh-my-pi (not this fork)
+
+To install the upstream oh-my-pi that pisces is forked from:
 
 ```bash
 bun install -g @oh-my-pi/pi-coding-agent
 ```
 
-### Via installer script
-
-**Linux / macOS:**
+Or via the upstream installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.sh | sh
 ```
-
-**Windows (PowerShell):**
-
-```powershell
-irm https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.ps1 | iex
-```
-
-By default, the installer uses Bun when available (and compatible), otherwise installs the prebuilt binary.
-
-Options:
-
-- POSIX (`install.sh`): `--source`, `--binary`, `--ref <ref>`, `-r <ref>`
-- PowerShell (`install.ps1`): `-Source`, `-Binary`, `-Ref <ref>`
-- `--ref`/`-Ref` with binary mode must reference a release tag; branch/commit refs require source mode
-
-Set custom install directory with `PI_INSTALL_DIR`.
-
-Examples:
-
-```bash
-# Source install (Bun)
-curl -fsSL https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.sh | sh -s -- --source
-
-# Install release tag via binary
-curl -fsSL https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.sh | sh -s -- --binary --ref v3.20.1
-
-# Install branch/commit via source
-curl -fsSL https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.sh | sh -s -- --source --ref main
-```
-
-```powershell
-# Install release tag via binary
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.ps1))) -Binary -Ref v3.20.1
-# Install branch/commit via source
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.ps1))) -Source -Ref main
-```
-
-### Via [mise](https://mise.jdx.dev)
-
-```bash
-mise use -g github:can1357/oh-my-pi
-```
-
-### Manual download
-
-Download binaries directly from [GitHub Releases](https://github.com/can1357/oh-my-pi/releases/latest).
 
 ---
 
@@ -557,7 +542,7 @@ For `cloudflare-ai-gateway`, set provider base URL to
 (for example in `~/.omp/agent/models.yml`).
 
 ```bash
-omp
+pisces
 /login
 ```
 
@@ -746,16 +731,16 @@ See [docs/session.md](docs/session.md) for the file format and API.
 Sessions auto-save to `~/.omp/agent/sessions/` (grouped by working directory).
 
 ```bash
-omp --continue             # Continue most recent session
-omp -c
+pisces --continue             # Continue most recent session
+pisces -c
 
-omp --resume               # Open session picker
-omp -r
+pisces --resume               # Open session picker
+pisces -r
 
-omp --resume <id-prefix>   # Resume by session ID prefix
-omp --resume <path>        # Resume by explicit .jsonl path
-omp --session <value>      # Alias of --resume
-omp --no-session    # Ephemeral mode (don't save)
+pisces --resume <id-prefix>   # Resume by session ID prefix
+pisces --resume <path>        # Resume by explicit .jsonl path
+pisces --session <value>      # Alias of --resume
+pisces --no-session           # Ephemeral mode (don't save)
 ```
 
 Session IDs are Snowflake-style hex IDs (not UUIDs).
@@ -1108,8 +1093,9 @@ export default factory;
 ## CLI Reference
 
 ```bash
-omp [options] [@files...] [messages...]
-omp <command> [args] [flags]
+pisces [options] [@files...] [messages...]
+pisces <command> [args] [flags]
+# omp is a symlink alias for pisces
 ```
 
 ### Options
@@ -1152,7 +1138,7 @@ omp <command> [args] [flags]
 
 ### Subcommands
 
-`omp` also ships dedicated subcommands:
+`pisces` also ships dedicated subcommands:
 
 - `commit`
 - `config`
@@ -1182,20 +1168,20 @@ Text files are wrapped in `<file ...>` blocks. Images are attached.
 
 ```bash
 # Interactive mode
-omp
+pisces
 # Non-interactive
-omp -p "List all .ts files in src/"
-omp -c "What did we discuss?"
+pisces -p "List all .ts files in src/"
+pisces -c "What did we discuss?"
 # Resume by ID prefix
-omp -r abc123
+pisces -r abc123
 
 # Model cycling with patterns
-omp --models "sonnet:high,haiku:low"
+pisces --models "sonnet:high,haiku:low"
 
 # Restrict toolset for read-only review
-omp --tools read,grep,find -p "Review the architecture"
+pisces --tools read,grep,find -p "Review the architecture"
 # Export session
-omp --export session.jsonl output.html
+pisces --export session.jsonl output.html
 ```
 
 ### Environment Variables
@@ -1251,7 +1237,7 @@ Notes:
 
 Example:
 
-`omp --tools read,grep,find -p "Review this codebase"`
+`pisces --tools read,grep,find -p "Review this codebase"`
 
 For adding new tools, see [Custom Tools](#custom-tools).
 
@@ -1298,7 +1284,7 @@ The SDK provides control over:
 For embedding from other languages or process isolation:
 
 ```bash
-omp --mode rpc --no-session
+pisces --mode rpc --no-session
 ```
 
 Send JSON commands on stdin:
@@ -1315,8 +1301,8 @@ Responses are emitted as `type: "response"`; session events stream on stdout as 
 ### HTML Export
 
 ```bash
-omp --export session.jsonl              # Auto-generated filename
-omp --export session.jsonl output.html  # Custom filename
+pisces --export session.jsonl              # Auto-generated filename
+pisces --export session.jsonl output.html  # Custom filename
 ```
 
 Works with session files and JSON event logs from `--mode json`.
@@ -1325,13 +1311,16 @@ Works with session files and JSON event logs from `--mode json`.
 
 ## Philosophy
 
-omp is a fork of [pi-mono](https://github.com/badlogic/pi-mono) by [Mario Zechner](https://github.com/mariozechner), extended with a batteries-included coding workflow.
+Pisces is a fork of [oh-my-pi](https://github.com/can1357/oh-my-pi) by [Can Bölük](https://github.com/can1357),
+which is itself a fork of [pi-mono](https://github.com/badlogic/pi-mono) by [Mario Zechner](https://github.com/mariozechner).
 
-Key ideas:
+Pisces adds first-class headless/server support on top of oh-my-pi's batteries-included
+coding workflow. Key ideas:
 
-- Keep interactive terminal-first UX for real coding work
+- Keep interactive terminal-first UX for real coding work (upstream oh-my-pi)
 - Include practical built-ins (tools, sessions, branching, subagents, extensibility)
 - Make advanced behavior configurable rather than hidden
+- Support headless `-p` mode as a first-class citizen for server/pipeline use
 
 ---
 
