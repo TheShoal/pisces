@@ -46,6 +46,10 @@ export interface Args {
 	noRules?: boolean;
 	listModels?: string | true;
 	noTitle?: boolean;
+	/** Bundled agent name to use as persona (e.g. "explore", "plan", "reviewer") */
+	agent?: string;
+	/** Skip ambient provider auto-discovery (Bedrock, Ollama, LM Studio, GitHub Copilot) */
+	noProviderDiscovery?: boolean;
 	messages: string[];
 	fileArgs: string[];
 	/** Unknown flags (potentially extension flags) - map of flag name to value */
@@ -68,10 +72,22 @@ export function parseArgs(args: string[], extensionFlags?: Map<string, { type: "
 			result.version = true;
 		} else if (arg === "--allow-home") {
 			result.allowHome = true;
+		} else if (arg.startsWith("--mode=")) {
+			// Handle --mode=<value> form (e.g. --mode=json)
+			const mode = arg.slice(7);
+			if (mode === "text" || mode === "json" || mode === "rpc" || mode === "acp") {
+				result.mode = mode;
+			} else {
+				process.stderr.write(`Unknown mode: ${mode}. Valid values: text, json, rpc, acp\n`);
+				process.exit(1);
+			}
 		} else if (arg === "--mode" && i + 1 < args.length) {
 			const mode = args[++i];
 			if (mode === "text" || mode === "json" || mode === "rpc" || mode === "acp") {
 				result.mode = mode;
+			} else {
+				process.stderr.write(`Unknown mode: ${mode}. Valid values: text, json, rpc, acp\n`);
+				process.exit(1);
 			}
 		} else if (arg === "--continue" || arg === "-c") {
 			result.continue = true;
@@ -163,6 +179,12 @@ export function parseArgs(args: string[], extensionFlags?: Map<string, { type: "
 			result.noRules = true;
 		} else if (arg === "--no-title") {
 			result.noTitle = true;
+		} else if (arg === "--agent" && i + 1 < args.length) {
+			result.agent = args[++i];
+		} else if (arg.startsWith("--agent=")) {
+			result.agent = arg.slice(8);
+		} else if (arg === "--no-provider-discovery") {
+			result.noProviderDiscovery = true;
 		} else if (arg === "--skills" && i + 1 < args.length) {
 			// Comma-separated glob patterns for skill filtering
 			result.skills = args[++i].split(",").map(s => s.trim());

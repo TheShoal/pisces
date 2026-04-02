@@ -134,6 +134,66 @@ describe("parseArgs", () => {
 			expect(result.mode).toBe("rpc");
 		});
 
+		test("parses --mode=json (equals form)", () => {
+			const result = parseArgs(["--mode=json"]);
+			expect(result.mode).toBe("json");
+		});
+
+		test("parses --mode=acp (equals form)", () => {
+			const result = parseArgs(["--mode=acp"]);
+			expect(result.mode).toBe("acp");
+		});
+
+		test("errors on unknown --mode value (space form)", () => {
+			const originalStderr = process.stderr;
+			const originalExit = process.exit;
+			let stderrOutput = "";
+			let exitCode: number | undefined;
+			process.stderr = {
+				write: (s: string) => {
+					stderrOutput += s;
+					return true;
+				},
+			} as any;
+			process.exit = ((code: number) => {
+				exitCode = code;
+			}) as any;
+			try {
+				parseArgs(["--mode", "badmode"]);
+			} catch {
+				// expected
+			}
+			process.stderr = originalStderr;
+			process.exit = originalExit;
+			expect(exitCode).toBe(1);
+			expect(stderrOutput).toContain("Unknown mode: badmode");
+		});
+
+		test("errors on unknown --mode=value (equals form)", () => {
+			const originalStderr = process.stderr;
+			const originalExit = process.exit;
+			let stderrOutput = "";
+			let exitCode: number | undefined;
+			process.stderr = {
+				write: (s: string) => {
+					stderrOutput += s;
+					return true;
+				},
+			} as any;
+			process.exit = ((code: number) => {
+				exitCode = code;
+			}) as any;
+			try {
+				parseArgs(["--mode=badmode"]);
+			} catch {
+				// expected
+			}
+			process.stderr = originalStderr;
+			process.exit = originalExit;
+			expect(exitCode).toBe(1);
+			expect(stderrOutput).toContain("Unknown mode: badmode");
+		});
+
 		test("parses --session as alias for --resume", () => {
 			const result = parseArgs(["--session", "/path/to/session.jsonl"]);
 			expect(result.resume).toBe("/path/to/session.jsonl");
