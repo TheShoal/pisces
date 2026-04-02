@@ -1,10 +1,10 @@
-# @oh-my-pi/pi-coding-agent
+# pisces — coding-agent package
 
-Core implementation package for the `omp` coding agent in the `oh-my-pi` monorepo.
+Core implementation package for the `pisces` coding agent.
+Fork of [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) with first-class headless/server support.
 
 For installation, setup, provider configuration, model roles, slash commands, and full CLI reference, see:
-- [Monorepo README (local)](../../README.md)
-- [Monorepo README (GitHub)](https://github.com/can1357/oh-my-pi#readme)
+- [README](../../README.md)
 
 Package-specific references:
 - [CHANGELOG](./CHANGELOG.md)

@@ -1,6 +1,6 @@
-# MCP configuration in OMP
+# MCP configuration in pisces
 
-This guide explains how to add, edit, and validate MCP servers for the OMP coding agent.
+This guide explains how to add, edit, and validate MCP servers for the pisces coding agent.
 
 Source of truth in code:
 
@@ -12,17 +12,17 @@ Source of truth in code:
 
 ## Preferred config locations
 
-OMP can discover MCP servers from multiple tools (`.claude/`, `.cursor/`, `.vscode/`, `opencode.json`, and more), but for OMP-native configuration you should usually use one of these files:
+pisces can discover MCP servers from multiple tools (`.claude/`, `.cursor/`, `.vscode/`, `opencode.json`, and more), but for pisces-native configuration you should usually use one of these files:
 
-- Project: `.omp/mcp.json`
-- User: `~/.omp/mcp.json`
+- Project: `.pisces/mcp.json`
+- User: `~/.pisces/mcp.json`
 
-OMP also accepts fallback standalone files in the project root:
+pisces also accepts fallback standalone files in the project root:
 
 - `mcp.json`
 - `.mcp.json`
 
-Use `.omp/mcp.json` when you want OMP to own the configuration. Use root `mcp.json` / `.mcp.json` only when you want a portable fallback file that other MCP clients may also read.
+Use `.pisces/mcp.json` when you want pisces to own the configuration. Use root `mcp.json` / `.mcp.json` only when you want a portable fallback file that other MCP clients may also read.
 
 ## Add a schema reference
 
@@ -35,11 +35,11 @@ Add this line at the top of the file for editor autocomplete and validation:
 }
 ```
 
-OMP now writes this automatically when `/mcp add`, `/mcp enable`, `/mcp disable`, `/mcp reauth`, or other config-writing flows create or update an OMP-managed MCP file.
+pisces now writes this automatically when `/mcp add`, `/mcp enable`, `/mcp disable`, `/mcp reauth`, or other config-writing flows create or update a pisces-managed MCP file.
 
 ## File shape
 
-OMP supports this top-level structure:
+pisces supports this top-level structure:
 
 ```json
 {
@@ -69,7 +69,7 @@ Shared fields for every transport:
 
 - `enabled?: boolean` — skip this server when `false`
 - `timeout?: number` — connection timeout in milliseconds
-- `auth?: { ... }` — auth metadata used by OMP for OAuth/API-key flows
+- `auth?: { ... }` — auth metadata used by pisces for OAuth/API-key flows
 - `oauth?: { ... }` — explicit OAuth client settings used during auth/reauth
 
 ### `stdio` transport
@@ -164,7 +164,7 @@ Example:
 
 ## Auth fields
 
-OMP understands two auth-related objects.
+pisces understands two auth-related objects.
 
 ### `auth`
 
@@ -178,7 +178,7 @@ OMP understands two auth-related objects.
 }
 ```
 
-Use this when OMP should remember how to rehydrate credentials for a server.
+Use this when pisces should remember how to rehydrate credentials for a server.
 
 ### `oauth`
 
@@ -315,13 +315,13 @@ This matches GitHub's official local Docker image `ghcr.io/github/github-mcp-ser
 
 This is the part that usually trips people up.
 
-### In `.omp/mcp.json` and `~/.omp/mcp.json`
+### In `.pisces/mcp.json` and `~/.pisces/mcp.json`
 
-Before OMP launches a server or makes an HTTP request, it resolves `env` and `headers` values like this:
+Before pisces launches a server or makes an HTTP request, it resolves `env` and `headers` values like this:
 
-1. If a value starts with `!`, OMP runs it as a shell command and uses trimmed stdout.
-2. Otherwise OMP first checks whether the value matches an environment variable name.
-3. If that environment variable is not set, OMP uses the string literally.
+1. If a value starts with `!`, pisces runs it as a shell command and uses trimmed stdout.
+2. Otherwise pisces first checks whether the value matches an environment variable name.
+3. If that environment variable is not set, pisces uses the string literally.
 
 Examples:
 
@@ -362,11 +362,11 @@ Example:
 }
 ```
 
-If you want the least surprising OMP behavior, prefer `.omp/mcp.json` and use explicit env/header values.
+If you want the least surprising pisces behavior, prefer `.pisces/mcp.json` and use explicit env/header values.
 
 ## `disabledServers`
 
-`disabledServers` is mainly useful in the user config file (`~/.omp/mcp.json`) when a server is discovered from some other source and you want OMP to ignore it without editing that other tool's config.
+`disabledServers` is mainly useful in the user config file (`~/.pisces/mcp.json`) when a server is discovered from some other source and you want pisces to ignore it without editing that other tool's config.
 
 Example:
 
@@ -393,7 +393,7 @@ After editing, use:
 - `/mcp list` to see which config file a server came from
 - `/mcp test <name>` to test a single server
 
-## Validation rules OMP enforces
+## Validation rules pisces enforces
 
 From `validateServerConfig()` in `packages/coding-agent/src/mcp/config.ts`:
 
@@ -405,16 +405,16 @@ From `validateServerConfig()` in `packages/coding-agent/src/mcp/config.ts`:
 Practical implications:
 
 - Omitting `type` means `stdio`
-- If you paste a remote server config and forget `"type": "http"`, OMP will treat it as `stdio` and complain that `command` is missing
+- If you paste a remote server config and forget `"type": "http"`, pisces will treat it as `stdio` and complain that `command` is missing
 - `sse` remains valid for compatibility, but new hosted servers should usually be configured as `http`
 
 ## Discovery and precedence
 
-OMP does not merge duplicate server definitions across files. Discovery providers are prioritized, and the higher-priority definition wins.
+pisces does not merge duplicate server definitions across files. Discovery providers are prioritized, and the higher-priority definition wins.
 
 In practice:
 
-- prefer `.omp/mcp.json` or `~/.omp/mcp.json` when you want an OMP-specific override
+- prefer `.pisces/mcp.json` or `~/.pisces/mcp.json` when you want a pisces-specific override
 - keep server names unique across tools when possible
 - use `disabledServers` in the user config when a third-party config keeps reintroducing a server you do not want
 
@@ -426,7 +426,7 @@ You probably omitted `type: "http"` on a remote server.
 
 ### `Server "name": both "command" and "url" are set`
 
-Pick one transport. OMP treats `command` as stdio and `url` as http/sse.
+Pick one transport. pisces treats `command` as stdio and `url` as http/sse.
 
 ### `/mcp add` worked but the server still does not connect
 
@@ -437,9 +437,9 @@ The JSON is valid, but the server may still be unreachable. Use `/mcp test <name
 - the remote URL is reachable
 - the OAuth or API token is valid
 
-### The server exists in another tool's config but not in OMP
+### The server exists in another tool's config but not in pisces
 
-Run `/mcp list`. OMP discovers many third-party MCP files, but project-level loading can also be disabled via the `mcp.enableProjectConfig` setting.
+Run `/mcp list`. pisces discovers many third-party MCP files, but project-level loading can also be disabled via the `mcp.enableProjectConfig` setting.
 
 ## References
 

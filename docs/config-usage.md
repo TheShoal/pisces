@@ -28,7 +28,7 @@ Key integration points:
 ```text
          Config roots (ordered)
 ┌───────────────────────────────────────┐
-│ 1) ~/.omp/agent + <cwd>/.omp          │
+│ 1) ~/.pisces/agent + <cwd>/.pisces    │
 │ 2) ~/.claude   + <cwd>/.claude        │
 │ 3) ~/.codex    + <cwd>/.codex         │
 │ 4) ~/.gemini   + <cwd>/.gemini        │
@@ -57,26 +57,26 @@ Key integration points:
 
 `src/config.ts` defines a fixed source priority list:
 
-1. `.omp` (native)
+1. `.pisces` (native)
 2. `.claude`
 3. `.codex`
 4. `.gemini`
 
 User-level bases:
 
-- `~/.omp/agent`
+- `~/.pisces/agent`
 - `~/.claude`
 - `~/.codex`
 - `~/.gemini`
 
 Project-level bases:
 
-- `<cwd>/.omp`
+- `<cwd>/.pisces`
 - `<cwd>/.claude`
 - `<cwd>/.codex`
 - `<cwd>/.gemini`
 
-`CONFIG_DIR_NAME` is `.omp` (`packages/utils/src/dirs.ts`).
+`CONFIG_DIR_NAME` is `.pisces` (`packages/utils/src/dirs.ts`).
 
 ## Important constraint
 
@@ -108,7 +108,7 @@ Searches for the first existing file across ordered bases, returns first match (
 
 ## `findAllNearestProjectConfigDirs(subpath, cwd)`
 
-Walks parent directories upward and returns the **nearest existing directory per source base** (`.omp`, `.claude`, `.codex`, `.gemini`), then sorts results by source priority.
+Walks parent directories upward and returns the **nearest existing directory per source base** (`.pisces`, `.claude`, `.codex`, `.gemini`), then sorts results by source priority.
 
 Use this when project config should be inherited from ancestor directories (monorepo/nested workspace behavior).
 
@@ -142,7 +142,7 @@ Legacy migration still supported:
 
 The runtime settings model is layered:
 
-1. Global settings: `~/.omp/agent/config.yml`
+1. Global settings: `~/.pisces/agent/config.yml`
 2. Project settings: discovered via settings capability (`settings.json` from providers)
 3. Runtime overrides: in-memory, non-persistent
 4. Schema defaults: from `SETTINGS_SCHEMA`
@@ -160,7 +160,7 @@ Write behavior:
 
 On startup, if `config.yml` is missing:
 
-1. Migrate from `~/.omp/agent/settings.json` (renamed to `.bak` on success)
+1. Migrate from `~/.pisces/agent/settings.json` (renamed to `.bak` on success)
 2. Merge with legacy DB settings from `agent.db`
 3. Write merged result to `config.yml`
 
@@ -188,7 +188,7 @@ Providers are sorted by numeric priority (higher first). Example priorities:
 ```text
 Provider precedence (higher wins)
 
-native (.omp)          priority 100
+native (.pisces)          priority 100
 claude                 priority  80
 codex / agents / ...   priority  70
 gemini                 priority  60
@@ -212,12 +212,12 @@ Relevant keys:
 
 ---
 
-## 6) Native `.omp` provider behavior (`src/discovery/builtin.ts`)
+## 6) Native `.pisces` provider behavior (`src/discovery/builtin.ts`)
 
 Native provider (`id: native`) reads from:
 
-- project: `<cwd>/.omp/...`
-- user: `~/.omp/agent/...`
+- project: `<cwd>/.pisces/...`
+- user: `~/.pisces/agent/...`
 
 ### Directory admission rule
 
@@ -238,7 +238,7 @@ Native provider (`id: native`) reads from:
 
 ### Nearest-project lookup nuance
 
-For `SYSTEM.md` and `AGENTS.md`, native provider uses nearest-ancestor project `.omp` directory search (walk-up) but still requires the `.omp` dir to be non-empty.
+For `SYSTEM.md` and `AGENTS.md`, native provider uses nearest-ancestor project `.pisces` directory search (walk-up) but still requires the `.pisces` dir to be non-empty.
 
 ---
 
