@@ -1854,11 +1854,18 @@ export class SessionManager {
 
 	/** Close the persistent writer after flushing all pending data. */
 	async close(): Promise<void> {
-		if (!this.#persistWriter) return;
-		await this.#queuePersistTask(async () => {
-			await this.#closePersistWriterInternal();
-			this.#flushed = true;
-		});
+		// Always drain the persist chain, even if the writer has already been
+		// closed or was never opened. An early return here leaves queued tasks
+		// unawaited and lets the Bun event loop exit before fsync completes.
+		await this.#queuePersistTask(
+			async () => {
+				if (this.#persistWriter) {
+					await this.#closePersistWriterInternal();
+					this.#flushed = true;
+				}
+			},
+			{ ignoreError: true },
+		);
 		if (this.#persistError) throw this.#persistError;
 	}
 

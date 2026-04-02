@@ -502,6 +502,10 @@ export interface AgentStartEvent {
 export interface AgentEndEvent {
 	type: "agent_end";
 	messages: AgentMessage[];
+	/** The 16-character hex session ID. */
+	sessionId: string;
+	/** Resolved path to the session file (may be undefined if session has no file). */
+	sessionFile: string | undefined;
 }
 
 /** Fired at the start of each turn */
