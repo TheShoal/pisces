@@ -53,8 +53,8 @@ import {
 import type { SearchDb } from "@oh-my-pi/pi-natives";
 import { abortableSleep, getAgentDbPath, isEnoent, logger } from "@oh-my-pi/pi-utils";
 import type { AsyncJob, AsyncJobManager } from "../async";
-import { BudgetController } from "../budget";
-import type { RunBudgetPolicy } from "../budget";
+import { BudgetController, type RunBudgetPolicy } from "../budget";
+import type { BudgetSnapshot } from "../budget/types";
 import type { Rule } from "../capability/rule";
 import { MODEL_ROLE_IDS, type ModelRegistry } from "../config/model-registry";
 import {
@@ -163,7 +163,6 @@ import type {
 	SessionManager,
 } from "./session-manager";
 import { getLatestCompactionEntry } from "./session-manager";
-import type { BudgetSnapshot } from "../budget/types";
 
 /** Session-specific events that extend the core AgentEvent */
 export type AgentSessionEvent =
@@ -606,11 +605,59 @@ export class AgentSession {
 		// Always subscribe to agent events for internal handling
 		// (session persistence, hooks, auto-compaction, retry logic)
 		this.#unsubscribeAgent = this.agent.subscribe(this.#handleAgentEvent);
+
+		// Initialize session-level budget controller if any limit is configured
+		const budgetPolicy = this.#readBudgetPolicy();
+		if (budgetPolicy) {
+			this.#budgetController = new BudgetController(budgetPolicy, "session", e => this.#emit(e));
+		}
 	}
 
 	/** Model registry for API key resolution and model discovery */
 	get modelRegistry(): ModelRegistry {
 		return this.#modelRegistry;
+	}
+
+	/** Budget controller for this session, if any limits are configured. */
+	get budgetController(): BudgetController | undefined {
+		return this.#budgetController;
+	}
+
+	/**
+	 * Read task.budget.* settings and return a RunBudgetPolicy if any limit is set.
+	 * Returns undefined when no budget settings are configured.
+	 */
+	#readBudgetPolicy(): RunBudgetPolicy | undefined {
+		const s = this.settings;
+		const maxWallTimeMs = s.get("task.budget.maxWallTimeMs") as number | undefined;
+		const maxInputTokens = s.get("task.budget.maxInputTokens") as number | undefined;
+		const maxOutputTokens = s.get("task.budget.maxOutputTokens") as number | undefined;
+		const maxTotalTokens = s.get("task.budget.maxTotalTokens") as number | undefined;
+		const maxCostUsd = s.get("task.budget.maxCostUsd") as number | undefined;
+		const maxToolCalls = s.get("task.budget.maxToolCalls") as number | undefined;
+		const maxSubagents = s.get("task.budget.maxSubagents") as number | undefined;
+		const warnAtRatio = s.get("task.budget.warnAtRatio") as number | undefined;
+		if (
+			maxWallTimeMs === undefined &&
+			maxInputTokens === undefined &&
+			maxOutputTokens === undefined &&
+			maxTotalTokens === undefined &&
+			maxCostUsd === undefined &&
+			maxToolCalls === undefined &&
+			maxSubagents === undefined
+		) {
+			return undefined;
+		}
+		return {
+			maxWallTimeMs,
+			maxInputTokens,
+			maxOutputTokens,
+			maxTotalTokens,
+			maxCostUsd,
+			maxToolCalls,
+			maxSubagents,
+			warnAtRatio,
+		};
 	}
 
 	consumeNextToolChoiceOverride(): ToolChoice | undefined {
@@ -665,6 +712,7 @@ export class AgentSession {
 			l(event);
 		}
 		getAdapter().onEvent(event);
+		this.#budgetController?.onEvent(event);
 	}
 
 	async #emitSessionEvent(event: AgentSessionEvent): Promise<void> {
@@ -2267,6 +2315,12 @@ export class AgentSession {
 	 * @throws Error if no model selected or no API key available (when not streaming)
 	 */
 	async prompt(text: string, options?: PromptOptions): Promise<void> {
+		// Refuse new turns if the session budget has been exceeded
+		if (this.#budgetController?.isExceeded()) {
+			const snapshot = this.#budgetController.getSnapshot();
+			logger.warn("Session budget exceeded; prompt rejected", { reason: snapshot.reason });
+			throw new Error(`Session budget exceeded (${snapshot.reason ?? "unknown"})`);
+		}
 		const expandPromptTemplates = options?.expandPromptTemplates ?? true;
 
 		// Handle extension commands first (execute immediately, even during streaming)

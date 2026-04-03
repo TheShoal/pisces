@@ -1054,6 +1054,33 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 			emitProgress();
 
 			const runTask = async (task: (typeof tasksWithContext)[number], index: number) => {
+				// Enforce session budget before spawning a subagent
+				if (this.session.budgetController?.isExceeded()) {
+					const snapshot = this.session.budgetController.getSnapshot();
+					this.session.emitEvent?.({
+						type: "budget_exceeded",
+						scope: "task",
+						snapshot,
+					});
+					return {
+						index,
+						id: task.id,
+						agent: agent.name,
+						agentSource: agent.source,
+						task: task.task,
+						assignment: task.assignment,
+						description: task.description,
+						exitCode: 1,
+						output: "",
+						stderr: "",
+						truncated: false,
+						durationMs: 0,
+						tokens: 0,
+						error: `Budget exceeded (${snapshot.reason ?? "limit"})`,
+						aborted: true,
+						abortReason: "budget_exceeded",
+					} satisfies SingleResult;
+				}
 				if (!isIsolated) {
 					this.session.emitEvent?.({ type: "subagent_start", id: task.id, agent: agent.name, isolated: false });
 					const nonIsolatedResult = await runSubprocess({
@@ -1196,6 +1223,32 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 									resolvedVerification.maxRetries >= 1
 								) {
 									const repairTask = buildRepairPrompt(task.task, attempt1, contextLineLimit);
+									// Check budget before spawning the repair subagent
+									if (this.session.budgetController?.isExceeded()) {
+										const snapshot = this.session.budgetController.getSnapshot();
+										this.session.emitEvent?.({
+											type: "budget_exceeded",
+											scope: "task",
+											snapshot,
+										});
+										// Abort repair — budget exceeded; return failed result from attempt1
+										const budgetErr = `Budget exceeded (${snapshot.reason ?? "limit"}); repair skipped`;
+										return {
+											...result,
+											exitCode: 1,
+											stderr: budgetErr,
+											error: budgetErr,
+											verification: {
+												requested: true,
+												profile: resolvedVerification.profile,
+												mode: resolvedVerification.mode,
+												status: "failed" as const,
+												attempts: [attempt1],
+												retriesUsed: 0,
+												onFailure: resolvedVerification.onFailure,
+											},
+										} satisfies SingleResult;
+									}
 									const repairResult = await runSubprocess({
 										cwd: this.session.cwd,
 										worktree: isolationDir,

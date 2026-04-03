@@ -1603,6 +1603,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		pendingActionStore,
 		searchDb,
 	});
+	toolSession.budgetController = session.budgetController;
 
 	if (model?.api === "openai-codex-responses") {
 		try {

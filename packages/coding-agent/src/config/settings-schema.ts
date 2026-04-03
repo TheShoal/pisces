@@ -1498,6 +1498,95 @@ export const SETTINGS_SCHEMA = {
 		},
 	},
 
+	// Budget policy
+	"task.budget.maxWallTimeMs": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Wall Time (ms)",
+			description: "Hard cap on session wall-clock time in milliseconds. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.maxInputTokens": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Input Tokens",
+			description: "Hard cap on total input tokens consumed. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.maxOutputTokens": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Output Tokens",
+			description: "Hard cap on total output tokens generated. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.maxTotalTokens": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Total Tokens",
+			description: "Hard cap on combined input+output token count. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.maxCostUsd": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Cost (USD)",
+			description: "Hard cap on total spend in US dollars. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.maxToolCalls": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Tool Calls",
+			description: "Hard cap on the number of tool calls dispatched. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.maxSubagents": {
+		type: "number",
+		default: undefined as number | undefined,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Max Subagents",
+			description: "Hard cap on the number of subagent spawns. Unset = no limit.",
+			submenu: true,
+		},
+	},
+
+	"task.budget.warnAtRatio": {
+		type: "number",
+		default: 0.8,
+		ui: {
+			tab: "advanced",
+			label: "Budget: Warn Threshold",
+			description: "Fraction of any limit at which a budget_warning event is emitted (default 0.8 = 80%).",
+			submenu: true,
+		},
+	},
+
 	"task.disabledAgents": {
 		type: "array",
 		default: [] as string[],

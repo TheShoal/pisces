@@ -497,6 +497,70 @@ Emitted after all commands in a verification attempt have run.
 All six event types appear in the `AgentSessionEvent` union and are forwarded through the existing RPC stream.
 No new transport or subscription channel is needed.
 
+---
+
+## Budget events
+
+Emitted when session resource consumption crosses a configured threshold.
+
+### `BudgetSnapshot`
+
+Embedded in both `budget_warning` and `budget_exceeded`.
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | `"ok" \| "warning" \| "exceeded"` | Current budget health |
+| `wallTimeMs` | `number` | Elapsed wall time in ms since `agent_start` |
+| `inputTokens` | `number` | Cumulative input tokens consumed |
+| `outputTokens` | `number` | Cumulative output tokens generated |
+| `totalTokens` | `number` | Cumulative total tokens |
+| `costUsd` | `number` | Cumulative cost in USD |
+| `toolCalls` | `number` | Total tool calls dispatched |
+| `subagents` | `number` | Total subagent spawns |
+| `reason` | `BudgetViolationReason \| undefined` | Dimension that triggered the event |
+
+`BudgetViolationReason` is one of: `"wall_time"`, `"input_tokens"`, `"output_tokens"`, `"total_tokens"`, `"cost"`, `"tool_calls"`, `"subagents"`.
+
+### `budget_warning`
+
+Emitted once per dimension when consumption reaches `warnAtRatio` (default 80%) of its configured limit.
+
+```ts
+{
+  type: "budget_warning";
+  scope: "session" | "task" | "subagent";
+  snapshot: BudgetSnapshot;
+}
+```
+
+### `budget_exceeded`
+
+Emitted once when any hard limit is crossed. The session will reject further `prompt()` calls; the task tool will abort pending subagent spawns.
+
+```ts
+{
+  type: "budget_exceeded";
+  scope: "session" | "task" | "subagent";
+  snapshot: BudgetSnapshot;
+}
+```
+
+### Budget settings
+
+All settings live under the `task.budget.*` namespace:
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `task.budget.maxWallTimeMs` | `number` | — | Max session wall time in ms |
+| `task.budget.maxInputTokens` | `number` | — | Max input tokens |
+| `task.budget.maxOutputTokens` | `number` | — | Max output tokens |
+| `task.budget.maxTotalTokens` | `number` | — | Max combined token count |
+| `task.budget.maxCostUsd` | `number` | — | Max spend in USD |
+| `task.budget.maxToolCalls` | `number` | — | Max tool call dispatches |
+| `task.budget.maxSubagents` | `number` | — | Max subagent spawns |
+| `task.budget.warnAtRatio` | `number` | `0.8` | Warn threshold as fraction of limit |
+
+Unset settings mean no limit for that dimension. The controller is only instantiated when at least one limit is configured.
 ## Notes on `RpcClient` helper
 
 `src/modes/rpc/rpc-client.ts` is a convenience wrapper, not the protocol definition.

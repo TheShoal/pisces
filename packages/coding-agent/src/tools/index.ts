@@ -2,6 +2,7 @@ import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { SearchDb } from "@oh-my-pi/pi-natives";
 import { $env, logger } from "@oh-my-pi/pi-utils";
 import type { AsyncJobManager } from "../async";
+import type { BudgetController } from "../budget";
 import type { PromptTemplate } from "../config/prompt-templates";
 import type { Settings } from "../config/settings";
 import type { Skill } from "../extensibility/skills";
@@ -184,6 +185,8 @@ export interface ToolSession {
 	setCheckpointState?: (state: CheckpointState | null) => void;
 	/** Emit a lifecycle event into the parent session's subscriber chain. */
 	emitEvent?: (event: AgentSessionEvent) => void;
+	/** Budget controller for the parent session — use isExceeded() before spawning subagents. */
+	budgetController?: BudgetController;
 }
 
 type ToolFactory = (session: ToolSession) => Tool | null | Promise<Tool | null>;
