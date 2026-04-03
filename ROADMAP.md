@@ -50,11 +50,13 @@ All items tracked in PLAN.md.
 - Three new settings: `telemetry.enabled`, `telemetry.endpoint`, `telemetry.serviceName`.
 - Adapter initialized from settings in `sdk.ts` when `telemetry.enabled = true`.
 
-### Epic 3. Budget policy and enforcement (P0.5)
+### Epic 3. Budget policy and enforcement (P0.5) — DONE
 
-- Add hard caps for spend, tokens, wall time, tool calls, and subagent fanout.
-- Surface budget burn and structured budget-exceeded reasons through RPC, SDK subscriptions, and stats.
-- Implement this on top of Epic 2's shared usage instrumentation so enforcement and observability use the same source of truth.
+- `RunBudgetPolicy` with 7 limit dimensions: `maxWallTimeMs`, `maxInputTokens`, `maxOutputTokens`, `maxTotalTokens`, `maxCostUsd`, `maxToolCalls`, `maxSubagents`.
+- `BudgetController` accumulates live counters from the `AgentSessionEvent` stream; emits `budget_warning` (at `warnAtRatio`, default 80%) and `budget_exceeded` events idempotently.
+- Hard enforcement: `AgentSession.prompt()` rejects new turns; `task` tool aborts subagent spawns and repair retries when budget is exceeded.
+- Eight new settings under `task.budget.*`; controller is only instantiated when at least one limit is configured.
+- `docs/rpc.md` updated with `BudgetSnapshot` field table, event shapes, and settings reference.
 
 ### Epic 4. Hybrid repo retrieval (P1)
 

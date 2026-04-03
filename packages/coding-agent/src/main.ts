@@ -752,8 +752,8 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 
 	// Lobster extension tools (PISCES_LOBSTER_MODE=1 or pisces.lobsterMode: true)
 	if (Bun.env.PISCES_LOBSTER_MODE === "1" || settings.get("pisces.lobsterMode")) {
-		const { messageUserTool, memorySearchTool } = await import("./lobster");
-		sessionOptions.customTools = [...(sessionOptions.customTools ?? []), messageUserTool, memorySearchTool];
+		const { createLobsterExtension } = await import("./lobster");
+		sessionOptions.extensions = [...(sessionOptions.extensions ?? []), createLobsterExtension];
 	}
 
 	// Extra MCP servers from PISCES_MCP_SOCKETS or pisces.mcpSockets config
