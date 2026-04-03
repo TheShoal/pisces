@@ -263,6 +263,17 @@ Extra conditional behavior:
 | `PI_EDIT_VARIANT`          | If `hashline`, forces hashline read/grep display mode when edit tool available               |
 | `PI_NO_PTY`                | If `1`, disables interactive PTY path for bash tool                                          |
 
+### Pisces-specific toggles
+
+| Variable                     | Default / behavior                                                                                   |
+|-----------------------------|------------------------------------------------------------------------------------------------------|
+| `PISCES_LOBSTER_MODE`       | If `1`, enables the lobster extension (messageUser, memorySearch tools)                             |
+| `PISCES_MCP_SOCKETS`        | Colon-separated Unix socket paths for shared MCP server pool (e.g., `/tmp/mcp.sock:/tmp/mcp2.sock`) |
+| `PISCES_MAJORDOMO_SOCKET`   | Unix socket path for majordomo-do sidecar (lobster extension)                                      |
+| `PISCES_RUN_CHANNEL_KEY`    | Per-run routing key for lobster extension memory searches                                              |
+| `MAJORDOMO_SOCKET`          | Fallback env var for `PISCES_MAJORDOMO_SOCKET`                                                     |
+| `RUN_CHANNEL_KEY`           | Fallback env var for `PISCES_RUN_CHANNEL_KEY`                                                       |
+
 `PI_NO_PTY` is also set internally when CLI `--no-pty` is used.
 
 ---

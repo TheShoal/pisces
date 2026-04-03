@@ -296,3 +296,36 @@ Settings capability items are not deduplicated; `Settings.#loadProjectSettings()
 - Legacy setting names `skills.enablePiUser` / `skills.enablePiProject` are still active gates for native skill source.
 
 If these compatibility paths are removed in code, update this document immediately; several runtime behaviors still depend on them today.
+
+## 10) Pisces-specific settings
+
+Pisces adds the following settings beyond oh-my-pi core:
+
+| Setting | Type | Default | Description |
+|:---|:---|:---|:---|
+| `pisces.preset` | string | - | Configuration preset (`lobster`, `headless`, `minimal`) |
+| `pisces.lobsterMode` | boolean | `false` | Enable lobster-party integration mode |
+| `pisces.noProviderDiscovery` | boolean | `false` | Disable automatic provider discovery from environment |
+| `pisces.mcpSockets` | string[] | `[]` | Unix socket paths for shared MCP server pool |
+| `shoal.enabled` | boolean | `true` | Enable shoal team orchestration extension |
+
+### Presets
+
+Presets apply a set of related settings for common deployment scenarios:
+
+|`lobster`| Sets `pisces.lobsterMode: true` and `pisces.noProviderDiscovery: true`. Optimized for lobster-party sandbox deployments.
+|`headless`| Disables shoal extension (`shoal.enabled: false`). Minimal TUI for server/CI environments.
+|`minimal`| Disables shoal extension and lobster mode. Basic functionality without extensions.
+
+### Example configuration
+
+```json
+"pisces": {
+  "preset": "lobster",
+  "mcpSockets": ["/tmp/shoal-mcp.sock"]
+},
+"shoal": {
+  "enabled": true
+}
+```
+

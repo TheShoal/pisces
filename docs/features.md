@@ -48,6 +48,40 @@ Disables automatic provider discovery from environment variables. When set, the 
 
 Redirects session storage for the process lifetime. Lets lobster-loop point each claw sandbox at an isolated session directory without relying on `PI_CODING_AGENT_DIR` and a full config mount. The flag is parsed and wired end-to-end to `SessionManager`.
 
+### Shoal team orchestration
+
+Shoal provides multi-agent team coordination for pisces. When enabled (`shoal.enabled: true`), it provides:
+
+**`/team` command** — interact with team runs from within a pisces session. Start a team run, check status, approve actions, or abort.
+
+**Shared MCP server pool** — when `PISCES_MCP_SOCKETS` is set, pisces connects to Unix socket MCP servers instead of spawning separate processes. This enables:
+- Reduced resource usage across multiple sessions
+- Shared state between agent sessions
+- Centralized MCP server management via shoal
+
+Environment variables:
+- `PISCES_MCP_SOCKETS` — colon-separated Unix socket paths (e.g., `/tmp/mcp.sock:/tmp/mcp2.sock`)
+- `shoal.enabled` — enable/disable shoal extension (default: `true`)
+
+Or configure via `pisces.mcpSockets` in config:
+
+```json
+"pisces": {
+  "mcpSockets": ["/tmp/mcp.sock", "/tmp/mcp2.sock"]
+}
+```
+
+### Presets
+
+pisces supports configuration presets for different deployment scenarios:
+
+|`pisces.preset` | Description |
+|:---|:---|
+| `lobster` | Optimized for lobster-party integration (lobsterMode + noProviderDiscovery) |
+| `headless` | Minimal TUI for server/CI environments |
+| `minimal` | Basic functionality with no extensions |
+
+
 ---
 
 ## oh-my-pi core (pi-coding-agent)
