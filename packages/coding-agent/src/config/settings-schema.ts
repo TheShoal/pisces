@@ -1399,6 +1399,73 @@ export const SETTINGS_SCHEMA = {
 		},
 	},
 
+	"task.verification.enabled": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "tasks",
+			label: "Task Verification Enabled",
+			description: "Enable verification profiles for isolated task runs",
+			submenu: true,
+		},
+	},
+
+	"task.verification.defaultProfile": {
+		type: "string",
+		default: "",
+		ui: {
+			tab: "tasks",
+			label: "Default Verification Profile",
+			description:
+				"Named verification profile used when isolated task verification is requested without an inline override",
+			submenu: true,
+		},
+	},
+
+	"task.verification.requireForIsolated": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "tasks",
+			label: "Require Verification For Isolated Tasks",
+			description: "Automatically require verification when isolated task execution is requested",
+			submenu: true,
+		},
+	},
+
+	"task.verification.maxRetries": {
+		type: "number",
+		default: 1,
+		ui: {
+			tab: "tasks",
+			label: "Task Verification Retries",
+			description: "Maximum bounded repair retries allowed for task verification flows",
+			submenu: true,
+		},
+	},
+
+	"task.verification.failureContextLineLimit": {
+		type: "number",
+		default: 200,
+		ui: {
+			tab: "tasks",
+			label: "Verification Failure Context Lines",
+			description: "How many verification output lines to preserve when building repair context",
+			submenu: true,
+		},
+	},
+
+	"task.verification.profiles": {
+		type: "record",
+		default: {} as Record<string, unknown>,
+		ui: {
+			tab: "tasks",
+			label: "Verification Profiles",
+			description: "Named isolated-task verification profiles keyed by profile name",
+			submenu: true,
+		},
+	},
+
 	"task.eager": {
 		type: "boolean",
 		default: false,
@@ -1448,6 +1515,39 @@ export const SETTINGS_SCHEMA = {
 			tab: "tasks",
 			label: "Todo auto-clear delay",
 			description: "How long to wait before removing completed/abandoned tasks from the list",
+			submenu: true,
+		},
+	},
+
+	// Telemetry
+	"telemetry.enabled": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "advanced",
+			label: "Enable Telemetry",
+			description: "Export OpenTelemetry spans to the configured OTLP endpoint",
+		},
+	},
+
+	"telemetry.endpoint": {
+		type: "string",
+		default: "http://localhost:4318/v1/traces",
+		ui: {
+			tab: "advanced",
+			label: "OTLP Endpoint",
+			description: "OTLP/HTTP traces endpoint (e.g. http://localhost:4318/v1/traces)",
+			submenu: true,
+		},
+	},
+
+	"telemetry.serviceName": {
+		type: "string",
+		default: "pisces",
+		ui: {
+			tab: "advanced",
+			label: "Service Name",
+			description: "OTel service.name attribute attached to every trace",
 			submenu: true,
 		},
 	},

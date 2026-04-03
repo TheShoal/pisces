@@ -101,6 +101,7 @@ import {
 	loadProjectContextFiles as loadContextFilesInternal,
 } from "./system-prompt";
 import { AgentOutputManager } from "./task/output-manager";
+import { OtelTelemetryAdapter, setAdapter } from "./telemetry";
 import { parseThinkingLevel, resolveThinkingLevelForModel, toReasoningEffort } from "./thinking";
 import {
 	BashTool,
@@ -677,6 +678,15 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		setPreferredImageProvider(imageProvider);
 	}
 
+	// Initialize telemetry adapter from settings
+	if (settings.get("telemetry.enabled") === true) {
+		setAdapter(
+			new OtelTelemetryAdapter({
+				endpoint: settings.get("telemetry.endpoint") ?? "http://localhost:4318/v1/traces",
+				serviceName: settings.get("telemetry.serviceName") ?? "pisces",
+			}),
+		);
+	}
 	const sessionManager =
 		options.sessionManager ??
 		logger.time("sessionManager", () =>
@@ -943,6 +953,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		activateDiscoveredMCPTools: toolNames => session.activateDiscoveredMCPTools(toolNames),
 		getCheckpointState: () => session.getCheckpointState(),
 		setCheckpointState: state => session.setCheckpointState(state ?? undefined),
+		emitEvent: event => session.pushEvent(event),
 		allocateOutputArtifact: async toolType => {
 			try {
 				return await sessionManager.allocateArtifactPath(toolType);

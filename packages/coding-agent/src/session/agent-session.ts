@@ -53,6 +53,8 @@ import {
 import type { SearchDb } from "@oh-my-pi/pi-natives";
 import { abortableSleep, getAgentDbPath, isEnoent, logger } from "@oh-my-pi/pi-utils";
 import type { AsyncJob, AsyncJobManager } from "../async";
+import { BudgetController } from "../budget";
+import type { RunBudgetPolicy } from "../budget";
 import type { Rule } from "../capability/rule";
 import { MODEL_ROLE_IDS, type ModelRegistry } from "../config/model-registry";
 import {
@@ -70,6 +72,7 @@ import type { LoadedCustomCommand } from "../extensibility/custom-commands";
 import type { CustomTool, CustomToolContext } from "../extensibility/custom-tools/types";
 import { CustomToolAdapter } from "../extensibility/custom-tools/wrapper";
 import type {
+	AgentEndEvent,
 	ExtensionCommandContext,
 	ExtensionRunner,
 	ExtensionUIContext,
@@ -115,6 +118,8 @@ import planModeToolDecisionReminderPrompt from "../prompts/system/plan-mode-tool
 };
 import ttsrInterruptTemplate from "../prompts/system/ttsr-interrupt.md" with { type: "text" };
 import type { SecretObfuscator } from "../secrets/obfuscator";
+import type { VerificationAttemptResult, VerificationResult } from "../task/types";
+import { getAdapter } from "../telemetry";
 import { resolveThinkingLevelForModel, toReasoningEffort } from "../thinking";
 import type { CheckpointState } from "../tools/checkpoint";
 import { outputMeta } from "../tools/output-meta";
@@ -158,10 +163,15 @@ import type {
 	SessionManager,
 } from "./session-manager";
 import { getLatestCompactionEntry } from "./session-manager";
+import type { BudgetSnapshot } from "../budget/types";
 
 /** Session-specific events that extend the core AgentEvent */
 export type AgentSessionEvent =
-	| AgentEvent
+	// Core agent events, with richer session-level shapes overriding the bare AgentEvent variants
+	| Exclude<AgentEvent, { type: "agent_end" | "turn_start" | "turn_end" }>
+	| AgentEndEvent
+	| TurnStartEvent
+	| TurnEndEvent
 	| { type: "auto_compaction_start"; reason: "threshold" | "overflow"; action: "context-full" | "handoff" }
 	| {
 			type: "auto_compaction_end";
@@ -179,7 +189,23 @@ export type AgentSessionEvent =
 	| { type: "retry_fallback_succeeded"; model: string; role: string }
 	| { type: "ttsr_triggered"; rules: Rule[] }
 	| { type: "todo_reminder"; todos: TodoItem[]; attempt: number; maxAttempts: number }
-	| { type: "todo_auto_clear" };
+	| { type: "todo_auto_clear" }
+	| { type: "subagent_start"; id: string; agent: string; isolated: boolean }
+	| { type: "subagent_end"; id: string; agent: string; exitCode: number; verification?: VerificationResult }
+	| { type: "subagent_verification_start"; id: string; attempt: number; profile?: string }
+	| { type: "subagent_verification_command_start"; id: string; attempt: number; commandName: string }
+	| {
+			type: "subagent_verification_command_end";
+			id: string;
+			attempt: number;
+			commandName: string;
+			exitCode: number;
+			durationMs: number;
+			artifactId?: string;
+	  }
+	| { type: "subagent_verification_end"; id: string; attempt: number; status: VerificationAttemptResult["status"] }
+	| { type: "budget_warning"; scope: "session" | "task" | "subagent"; snapshot: BudgetSnapshot }
+	| { type: "budget_exceeded"; scope: "session" | "task" | "subagent"; snapshot: BudgetSnapshot };
 
 /** Listener function for agent session events */
 export type AgentSessionEventListener = (event: AgentSessionEvent) => void;
@@ -411,6 +437,7 @@ export class AgentSession {
 	#unsubscribeAgent?: () => void;
 	#unsubscribePendingActionPush?: () => void;
 	#eventListeners: AgentSessionEventListener[] = [];
+	#budgetController: BudgetController | undefined;
 
 	/** Tracks pending steering messages for UI display. Removed when delivered. */
 	#steeringMessages: string[] = [];
@@ -637,11 +664,12 @@ export class AgentSession {
 		for (const l of listeners) {
 			l(event);
 		}
+		getAdapter().onEvent(event);
 	}
 
 	async #emitSessionEvent(event: AgentSessionEvent): Promise<void> {
-		await this.#emitExtensionEvent(event);
-		this.#emit(event);
+		const enriched = await this.#emitExtensionEvent(event);
+		this.#emit(enriched);
 	}
 
 	// Track last assistant message for auto-compaction check
@@ -668,7 +696,7 @@ export class AgentSession {
 			}
 		}
 
-		await this.#emitSessionEvent(event);
+		await this.#emitSessionEvent(event as AgentSessionEvent);
 
 		if (event.type === "turn_start") {
 			this.#resetStreamingEditState();
@@ -1491,19 +1519,21 @@ export class AgentSession {
 	}
 
 	/** Emit extension events based on session events */
-	async #emitExtensionEvent(event: AgentSessionEvent): Promise<void> {
-		if (!this.#extensionRunner) return;
+	async #emitExtensionEvent(event: AgentSessionEvent): Promise<AgentSessionEvent> {
+		if (!this.#extensionRunner) return event;
 		if (event.type === "agent_start") {
 			this.#turnIndex = 0;
 			this.#nextToolChoiceOverride = undefined;
 			await this.#extensionRunner.emit({ type: "agent_start" });
 		} else if (event.type === "agent_end") {
-			await this.#extensionRunner.emit({
+			const enriched: AgentEndEvent = {
 				type: "agent_end",
 				messages: event.messages,
 				sessionId: this.sessionManager.getSessionId(),
 				sessionFile: this.sessionManager.getSessionFile(),
-			});
+			};
+			await this.#extensionRunner.emit(enriched);
+			return enriched;
 		} else if (event.type === "turn_start") {
 			const hookEvent: TurnStartEvent = {
 				type: "turn_start",
@@ -1511,6 +1541,7 @@ export class AgentSession {
 				timestamp: Date.now(),
 			};
 			await this.#extensionRunner.emit(hookEvent);
+			return hookEvent;
 		} else if (event.type === "turn_end") {
 			const hookEvent: TurnEndEvent = {
 				type: "turn_end",
@@ -1520,6 +1551,7 @@ export class AgentSession {
 			};
 			await this.#extensionRunner.emit(hookEvent);
 			this.#turnIndex++;
+			return hookEvent;
 		} else if (event.type === "message_start") {
 			const extensionEvent: MessageStartEvent = {
 				type: "message_start",
@@ -1566,6 +1598,7 @@ export class AgentSession {
 				isError: event.isError ?? false,
 			};
 			await this.#extensionRunner.emit(extensionEvent);
+			return extensionEvent;
 		} else if (event.type === "auto_compaction_start") {
 			await this.#extensionRunner.emit({
 				type: "auto_compaction_start",
@@ -1607,6 +1640,7 @@ export class AgentSession {
 				maxAttempts: event.maxAttempts,
 			});
 		}
+		return event;
 	}
 
 	/**
@@ -1624,6 +1658,11 @@ export class AgentSession {
 				this.#eventListeners.splice(index, 1);
 			}
 		};
+	}
+
+	/** Push an external event into the session's event stream (for tool-emitted lifecycle events). */
+	pushEvent(event: AgentSessionEvent): void {
+		this.#emit(event);
 	}
 
 	/**
@@ -1672,6 +1711,7 @@ export class AgentSession {
 		this.#unsubscribePendingActionPush = undefined;
 		this.#disconnectFromAgent();
 		this.#eventListeners = [];
+		await getAdapter().shutdown();
 	}
 
 	#closeAllProviderSessions(reason: string): void {

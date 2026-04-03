@@ -58,7 +58,7 @@ const agentEventTypes = new Set<AgentEvent["type"]>([
 	"tool_execution_end",
 ]);
 
-const isAgentEvent = (event: AgentSessionEvent): event is AgentEvent =>
+const isAgentEvent = (event: AgentSessionEvent): event is Extract<AgentSessionEvent, { type: AgentEvent["type"] }> =>
 	agentEventTypes.has(event.type as AgentEvent["type"]);
 
 function normalizeModelPatterns(value: string | string[] | undefined): string[] {
