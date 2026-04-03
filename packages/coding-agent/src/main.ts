@@ -744,8 +744,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	sessionOptions.modelRegistry = modelRegistry;
 	sessionOptions.hasUI = isInteractive;
 
-	// Shoal-first: inject active session context into system prompt via inline extension.
-	// Reads the Shoal SQLite DB directly — no daemon needed, zero noise when idle.
+	// Shoal-first: inject active session context into system prompt and register /team command.
 	if (settings.get("shoal.enabled")) {
 		const { shoalExtension, registerTeamCommand } = await import("./shoal");
 		sessionOptions.extensions = [...(sessionOptions.extensions ?? []), shoalExtension, registerTeamCommand];

@@ -3,11 +3,20 @@
 ## [Unreleased]
 ### Added
 
-- Added `edit.manageImports` setting to enable/disable post-edit import and include management
-- Added import/include management for TypeScript, JavaScript, Python, Rust, Go, and C/C++ in edit operations
-- Added `imports` parameter to patch, hashline, and replace edit operations to declare imports/includes needed after code changes
-- Added `ImportSpec` type to specify structured import requests with support for named imports, default imports, namespace imports, aliases, and system includes
-- Added comprehensive import handler modules for each supported language with deduplication and grouping logic
+- Added `/team approve <id> [reason]` and `/team deny <id> [reason]` slash commands for resolving pending action requests from worker agents
+- Added `shoal_request_action` LLM tool so worker agents can submit action requests to the Shoal action bus before performing privileged operations
+- Added workflow correlation IDs (`wf_<uuid>`) threaded through orchestration progress, TUI widget, journal entries, and completion notifications
+- Added `ShoalMcpBridge` action bus methods: `requestAction`, `listPendingActions`, `approveAction`, `denyAction`
+- Added `ShoalMcpBridge` message envelope methods: `watchMessages`, `getWorkflowMessages`, `watchActions`, `ackMessage`
+- Added wave-level action gating in `ShoalOrchestrator`: polls pending actions after each wave and holds execution until all are resolved or the run is aborted
+- Added `PISCES_SHOAL_EXECUTION_MODEL.md` decision guide covering task vs /team scopes, boundary rules, and integration contract
+- Added Shoal multi-agent orchestration layer at `src/shoal/` with wave-based DAG execution, session lifecycle management, and expertise persistence via fins
+- Added `/team run <file.yaml>` slash command to execute a declarative team definition; validates YAML, detects dependency cycles, and renders live per-agent status via a TUI widget
+- Added `/team status` and `/team abort` slash commands for inspecting and cancelling an active team run
+- Added `shoal_team_run`, `shoal_team_status`, and `shoal_team_abort` LLM-callable tools exposing the same orchestration to the agent loop
+- Added `ShoalMcpBridge` class for managing a `shoal-mcp-server` subprocess connection over stdio MCP
+- Added `ShoalOrchestrator` class driving poll-first wave execution with abort propagation and per-agent expertise fin triggers on completion
+- Added `pisces-expertise` fin (`fins/pisces-expertise/`) in shoal-cli: reads a completed session's journal, summarises discoveries via `amazon.nova-lite-v1:0`, and appends timestamped bullets to `~/.config/shoal/templates/<template>/expertise.md`
 - Added `edit.manageImports` setting to enable/disable post-edit import and include management
 - Added import/include management for TypeScript, JavaScript, Python, Rust, Go, and C/C++ in edit operations
 - Added `imports` parameter to patch, hashline, and replace edit operations to declare imports/includes needed after code changes
@@ -23,6 +32,9 @@
 
 ### Changed
 
+- `awareness.ts` now uses `ShoalMcpBridge.listSessions(cwd)` with server-side path filtering; dropped client-side worktree prefix loop and `bun:sqlite` dependency
+- `ShoalMcpBridge.listSessions` accepts an optional `path` parameter forwarded to `list_sessions` MCP tool
+- Moved `shoal.ts` (Shoal awareness extension) to `src/shoal/awareness.ts`; `src/shoal/index.ts` barrel maintains the existing import path
 - Updated edit tool prompts to document import management feature when enabled
 - Modified edit tool schemas to conditionally include `imports` parameter based on `edit.manageImports` setting
 - Enhanced patch, hashline, and replace tool documentation with import management examples and guidance
