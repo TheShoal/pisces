@@ -1,240 +1,246 @@
 # Full Feature Reference
 
-Complete reference for every major subsystem in pisces. Each entry links to the full doc for implementation details.
+Complete reference for every major subsystem in pisces. Organised into three tiers:
+- **pisces-native** — built or modified in this fork
+- **oh-my-pi core** — the pi-coding-agent package
+- **oh-my-pi platform** — TUI, AI, agent-core, natives, and other packages
 
 ---
 
-## Execution modes
+## Pisces-native features
 
-### RPC mode
-Run pisces as a headless subprocess. Communication is newline-delimited JSON over stdio — send `RpcCommand` objects in, receive `RpcResponse` and session events out. Supports full session lifecycle: create, prompt, steer, abort, branch, hand off, export. Designed to embed pisces inside orchestrators, CI pipelines, or other agents.
+### lobster-party integration mode
 
-```bash
-pisces --mode rpc
+`PISCES_LOBSTER_MODE=1` activates the lobster extension, injecting two additional LLM-callable tools that communicate with the majordomo-do sidecar over a Unix socket:
+
+**`messageUser`** — sends a message directly into the user-facing lobster-party chat interface. Used by the agent to ask clarifying questions or surface status updates without polluting the session transcript.
+
+**`memorySearch`** — queries the majordomo-do memory index for project-relevant context (technical decisions, prior conversation summaries, recurring workflows). Retrieval is scoped to the current run channel and retried up to 4 times with exponential backoff on transient socket failures.
+
+Both tools are loaded via `CreateAgentSessionOptions.customTools` and are absent when `PISCES_LOBSTER_MODE` is unset — zero overhead in non-lobster deployments.
+
+Environment variables:
+- `PISCES_LOBSTER_MODE=1` — enable the extension
+- `PISCES_MAJORDOMO_SOCKET` (or `MAJORDOMO_SOCKET`) — Unix socket path for the sidecar
+- `PISCES_RUN_CHANNEL_KEY` (or `RUN_CHANNEL_KEY`) — per-run routing key
+
+### `agent_end` session metadata
+
+`AgentEndEvent` carries `sessionId` and `sessionFile` alongside `messages`. This lets any RPC or JSON-mode consumer extract the session file path at turn completion without parsing the session header separately — the primary hook for lobster-loop's conversation persistence model.
+
+```json
+{ "type": "agent_end", "sessionId": "abc123…", "sessionFile": "/path/to/sessions/…jsonl", "messages": […] }
 ```
 
-Commands include `prompt`, `steer`, `follow_up`, `abort`, `abort_and_prompt`, `new_session`, `get_state`, `set_model`, `bash`, `read_file`, `write_file`, `fork_session`, `resume_session`, `export_session`. Extension UI requests flow back through the same channel.
+### `--mode=json` flag fix
+
+The upstream `--mode json` (space form) worked; `--mode=json` (equals form) silently fell back to text mode. Both forms now parse identically. Unrecognised mode values emit a loud error to stderr: `Unknown mode: <x>. Valid values: text, json, rpc, acp`.
+
+### `--agent <name>` flag
+
+Selects which bundled or discovered agent definition runs in print mode. Matches opencode's `--agent=<name>` interface, letting lobster-loop dispatch the `plan` agent for read-only planning turns vs the default `task` agent for execution turns.
+
+### `--no-provider-discovery` flag
+
+Disables automatic provider discovery from environment variables. When set, the agent only loads providers explicitly configured in `config.yml`. Required for lobster sandbox deployments where ambient `AWS_*` and `ANTHROPIC_*` variables must not override the intended provider.
+
+### `--session-dir <path>` (wired)
+
+Redirects session storage for the process lifetime. Lets lobster-loop point each claw sandbox at an isolated session directory without relying on `PI_CODING_AGENT_DIR` and a full config mount. The flag is parsed and wired end-to-end to `SessionManager`.
+
+---
+
+## oh-my-pi core (pi-coding-agent)
+
+### Execution modes
+
+| Mode | Flag | Use |
+|---|---|---|
+| Interactive TUI | (default) | Full terminal UI with PTY, inline images, keyboard nav |
+| Print / single-shot | `-p` / `--print` | Send one or more prompts, stream response, exit |
+| JSON event stream | `--mode json` | JSONL event stream on stdout for programmatic consumers |
+| RPC | `--mode rpc` | Bidirectional JSON-RPC over stdio — full session control |
+| ACP | `--mode acp` | Agent Control Protocol mode (in progress) |
+
+Print mode emits the session header as the first JSON line. `agent_end` carries `sessionId` and `sessionFile`. Session files are durable before process exit — the persist queue drains synchronously via `sessionManager.close()` before `dispose()`.
 
 → [RPC Protocol Reference](/rpc)
 
-### SDK (in-process)
-Embed directly in any Bun/Node process via `@oh-my-pi/pi-coding-agent`. `createAgentSession()` returns a fully wired session with auto-discovered extensions, skills, MCP servers, and tools. Subscribe to typed events, inject messages, control tools, and manage session state without spawning a child process.
+### Session model
 
-→ [SDK Reference](/sdk)
+Every entry — user message, assistant message, tool call, tool result, compaction, branch summary — is a node in an append-only tree keyed by `id`/`parentId`. The active position is `leafId`. The log is never rewritten; branching changes the leaf pointer only.
 
-### Interactive TUI
-Full terminal UI with differential rendering, PTY overlays, inline image display, and keyboard-driven session navigation. Not the primary focus of this fork but fully functional.
+**Navigation** — `/tree` opens an interactive tree navigator. The active branch path is highlighted; other branches show their last entry as context. Switching branches generates an automatic `BranchSummaryEntry` for the abandoned path.
 
-→ [TUI internals](/tui-runtime-internals)
+**Compaction** — when the context window fills, the oldest entries are summarised into a `CompactionEntry` with a configurable `firstKeptEntryId` boundary. Compaction entries are first-class nodes — the full pre-compaction history is never deleted.
 
----
+**`/handoff`** — generates a structured context summary, creates a new session, and injects the summary as the opening system message. Useful for a clean context start that still carries forward project state.
 
-## Session model
+**Session operations** — export (HTML/markdown), share (read-only link), fork (new session file at current leaf), resume (by session ID or `--continue` for the latest).
 
-### Append-only session tree
-Every entry (message, tool call, tool result, compaction, branch summary) is a node with `id` and `parentId`. The tree is never rewritten — branching changes `leafId`, not the log. The full history of every branch survives.
+→ [Session model](/session) · [Session tree](/session-tree-plan) · [Compaction](/compaction) · [Operations](/session-operations-export-share-fork-resume)
 
-### Branching & `/tree` navigation
-`/tree` opens an interactive navigator showing all branches. Switching branches generates an automatic branch summary for the abandoned path, then replaces the active context with entries on the new path. `/branch` creates a new branch at the current leaf.
+### Time-Traveling Stream Rules (TTSR)
 
-### Context compaction
-When the context window fills, compaction summarises the oldest entries into a single `CompactionEntry`. The boundary (`firstKeptEntryId`) controls exactly which entries are replaced. Compaction entries are first-class session nodes, not destructive rewrites — you can navigate past them.
-
-### `/handoff`
-Generates a structured context summary for the current session, creates a new session, and injects the summary as the opening message. Use when starting a new task that benefits from a clean context but needs awareness of prior work.
-
-### Session operations
-Export, share (read-only URL), fork (branch into a new session file), and resume prior sessions. All operations preserve the full tree.
-
-→ [Session model](/session) · [Branching & tree](/session-tree-plan) · [Compaction](/compaction) · [Operations](/session-operations-export-share-fork-resume)
-
----
-
-## Time-Traveling Stream Rules (TTSR)
-
-Rules with a `ttsrTrigger` pattern watch the model's output token-by-token. When the pattern matches mid-stream:
-
-1. The current generation is interrupted.
-2. The rule's content is injected into the context at the point of interruption.
-3. The generation retries from that point with the rule already present.
-
-Zero upfront context cost — a rule that never fires never touches the context window. Rules deduplicate by name; the highest-priority provider wins.
+Rules with a `ttsrTrigger` pattern watch the model's token stream. When the pattern matches mid-stream, the generation is interrupted, the rule content is injected at the interruption point, and the generation retries. Rules that never match cost zero tokens. Deduplicated by name; higher-priority provider wins.
 
 → [TTSR injection lifecycle](/ttsr-injection-lifecycle)
 
----
+### Parallel subagents
 
-## Parallel subagents
+The `task` tool dispatches a typed batch of named agents in parallel, each in its own isolated session. `isolated: true` runs agents in git worktrees and returns diff patches. Spawn depth is enforced — at the limit, the `task` tool is removed from the child's toolset.
 
-### Task tool
-Dispatch a batch of named agents to run in parallel. Each task gets its own isolated session. Results stream back as the agents complete. The `context` field is prepended to every task's `assignment` — share constraints once rather than duplicating across tasks.
-
-### Isolation backends
-Set `isolated: true` on a task batch to run each agent in a git worktree. The agent operates on a real filesystem copy. When the agent finishes, pisces produces a diff patch — the parent session can apply, inspect, or discard it without touching the working tree.
-
-### Spawn depth & agent restrictions
-Each `AgentDefinition` declares which agent types it can `spawns`. The runtime enforces a maximum recursion depth — at the limit, the `task` tool is removed from the child's toolset and `spawns` is cleared. Agents cannot escape their depth budget.
-
-### Bundled agents
-`task` (general), `plan` (read-only planning), `code-reviewer`, `debug-test-failure`, `fix-pr-comments`, `upgrade-dependency`, `explore` (read-only scout), `oracle` (reasoning advisor), `librarian` (external API research), `quick_task` (mechanical updates).
+**Bundled agents:** `task`, `plan` (read-only), `code-reviewer`, `debug-test-failure`, `fix-pr-comments`, `upgrade-dependency`, `explore`, `oracle`, `librarian`, `quick_task`.
 
 → [Task agent discovery](/task-agent-discovery)
 
----
+### Persistent IPython kernel
 
-## Rust-native core
-
-All performance-critical primitives run inside a Rust N-API module (`@oh-my-pi/pi-natives`). No shelling out for search, no third-party binary dependencies.
-
-| Capability | Details |
-|---|---|
-| `grep` | Regex search with `.gitignore` support, match streaming, configurable context lines |
-| `glob` | Recursive glob with shared FS scan cache; cache invalidated on writes |
-| `fuzzyFind` | `fd`-style fuzzy file finder |
-| `pty` | Full PTY with resize, signal, raw/cooked mode |
-| `shell` | Subprocess with merged stdout/stderr, cancellation, timeout |
-| `highlight` | Syntax highlighting to ANSI escape sequences |
-| `text` | ANSI-aware `wrapText`, `truncateToWidth`, `sliceWithWidth` |
-| `image` | Decode/encode images, screenshot HTML to PNG, clipboard read/write |
-| `html` | HTML-to-PNG rendering for artifact display |
-
-The FS scan cache (`fs_cache`) is shared across `grep` and `glob` calls within a session. Directory entries are cached on first read and invalidated when the agent writes to that subtree — subsequent search calls skip `readdir` for unchanged directories.
-
-→ [Natives architecture](/natives-architecture) · [Text/search pipeline](/natives-text-search-pipeline)
-
----
-
-## Persistent IPython kernel
-
-The `python` tool runs cells through a Jupyter Kernel Gateway rather than spawning `python -c` per call. The kernel persists for the lifetime of the session:
-
-- Variables, imports, and in-memory state survive between tool calls.
-- `reset: true` restarts the kernel before the first cell in a call.
-- Rich output — DataFrames, matplotlib figures, Mermaid diagrams, HTML — renders inline in the TUI and is captured in RPC/SDK event streams.
-
-Two gateway modes: auto-managed local gateway (started on demand) or externally configured via `PI_PYTHON_GATEWAY_URL`. The local gateway is shared across sessions on the same machine via a coordinator lock.
+The `python` tool runs cells through a Jupyter Kernel Gateway. The kernel persists across calls; variables, imports, and state survive between turns. `reset: true` restarts the kernel before the first cell in a call. Rich output — DataFrames, matplotlib figures, Mermaid diagrams, HTML — renders inline. Local gateway auto-starts on demand and is shared across sessions via a coordinator lock.
 
 → [Python runtime](/python-repl)
 
----
+### Structured storage: blobs & artifacts
 
-## Structured storage: blobs & artifacts
+Large outputs and binary data are stored outside the session JSONL:
 
-Long tool output and binary data never bloat the session JSONL:
-
-**Content-addressed blobs** — global, keyed by SHA-256. Images and large binary payloads are stored once and referenced as `blob:sha256:<hash>`. The same image used in multiple sessions takes disk space once.
-
-**Session artifacts** — per-session directory (named after the session file). Full tool output, subagent results, and truncated bash output are written here and referenced as `artifact://<id>`. Retrievable by any subsequent tool call in the same session.
-
-The model sees truncated output inline and can request the full content via the `artifact://` URI when needed — context stays lean without information loss.
+- **Content-addressed blobs** (`blob:sha256:<hash>`) — global, deduplicated. The same image across multiple sessions is stored once.
+- **Session artifacts** — per-session directory. Full tool output and subagent results referenced via `artifact://` URIs. The model requests full content on demand; context stays lean.
 
 → [Blob and artifact architecture](/blob-artifact-architecture)
 
----
+### MCP integration
 
-## MCP integration
-
-### Transports
-Both `stdio` (subprocess) and HTTP/SSE transports are supported. The HTTP transport handles reconnect, SSE ping keepalive, and OAuth token refresh transparently.
-
-### Fast startup gate
-MCP servers connect in parallel at session start. pisces waits up to 250ms, returns `DeferredMCPTool` handles for any servers still connecting, then completes session startup without blocking on slow servers. Deferred tools resolve in the background.
-
-### Live refresh
-`/mcp` disconnects all servers, re-discovers configs, and re-registers tools into the live session — no restart required.
-
-### Exa integration
-Exa MCP servers are filtered from the standard tool list. The API key is extracted and wired into the native Exa tool instead, which uses the key directly without the MCP round-trip overhead.
+Supports `stdio` and HTTP/SSE transports. Servers connect in parallel at session start with a 250ms fast-startup gate — `DeferredMCPTool` handles are returned for slow servers and resolve in the background. Live refresh via `/mcp` without restart. Exa servers are filtered and their API key is wired to the native Exa tool directly.
 
 → [MCP runtime lifecycle](/mcp-runtime-lifecycle) · [Protocol & transports](/mcp-protocol-transports) · [MCP config](/mcp-config)
 
----
+### Extension model
 
-## Extension model
+A default-exported TypeScript factory receives `ExtensionAPI` and can register LLM-callable tools, slash commands, keyboard shortcuts, event interceptors (with blocking), and custom TUI renderers. Hot-discovered from `~/.pisces/agent/extensions` and `.pisces/extensions`. Gemini-format `gemini-extension.json` manifests are also supported.
 
-### Extensions (TypeScript)
-A default-exported factory receives `ExtensionAPI` and can register:
-
-- **LLM-callable tools** — TypeBox-typed, streamed results, appear in the model's tool list
-- **Slash commands** — `/yourcommand [args]` routed through the input controller
-- **Event handlers** — intercept `tool_call`, `tool_result`, `message`, `session_start`, and more; return `{ block: true }` to veto, mutate inputs/outputs in place
-- **Custom renderers** — override how specific tool calls or message types render in the TUI
-- **Session injection** — `sendMessage`, `sendUserMessage`, `appendEntry` for programmatic message injection
-
-Extensions are hot-discovered from `~/.pisces/agent/extensions` (user) and `.pisces/extensions` (project). The factory pattern means extensions are plain TypeScript modules with no build step.
+→ [Extensions](/extensions) · [Extension loading](/extension-loading) · [Gemini manifest extensions](/gemini-manifest-extensions)
 
 ### Skills
-File-backed context packs. A `SKILL.md` file is listed in the system prompt by name+description. The model reads the full content on demand via `read skill://<name>`. Skills activate just in time — no upfront token cost for skills that aren't needed.
+
+File-backed context packs (`SKILL.md`). Listed in the system prompt by name+description only. Full content is fetched on demand via `read skill://<name>`. Zero upfront token cost for skills that don't fire.
 
 → [Skills](/skills)
 
-### TTSR rules
-Trigger-pattern-gated rules injected mid-stream. See [TTSR section](#time-traveling-stream-rules-ttsr) above.
-
 ### Hooks
-Pre/post tool call interceptors with blocking capability. The current runtime routes hooks through the extension runner, but the hook API (`HookAPI`) remains a lighter alternative for simple intercept-only use cases.
 
-→ [Hooks](/hooks) · [Extensions](/extensions) · [Extension loading](/extension-loading)
+Pre/post tool call interceptors with blocking capability. `HookAPI` is a lighter alternative to extensions for intercept-only use cases. Currently routed through the extension runner in the default CLI startup path.
 
----
+→ [Hooks](/hooks)
 
-## Plugin marketplace
+### Plugin marketplace
 
-Install plugins from any Git-hosted catalog using the Claude plugin registry format. Plugins bundle skills, slash commands, hooks, MCP servers, and LSP servers as a unit.
-
-```
-/marketplace add anthropics/claude-plugins-official
-/marketplace install wordpress.com@claude-plugins-official
-```
-
-Scopes: **user** (all projects, `~/.pisces/plugins/`) or **project** (`.pisces/installed_plugins.json`). Project-scoped plugins shadow user-scoped ones.
+Install plugins from any Git-hosted catalog in the Claude plugin registry format. Plugins bundle skills, commands, hooks, MCP servers, and LSP server configs as a unit. User scope (`~/.pisces/plugins/`) and project scope (`.pisces/installed_plugins.json`); project scope shadows user scope.
 
 → [Marketplace](/marketplace)
 
----
+### Autonomous memory
 
-## Tool runtime details
+When enabled, a background pipeline extracts durable knowledge from past sessions and injects a compact summary at each new session start. Phase 1 extracts per-session signal (decisions, constraints, resolved failures); phase 2 consolidates into `MEMORY.md`, `memory_summary.md`, and generated skill playbooks. Retrievable via `memory://root`, `memory://root/MEMORY.md`, and `memory://root/skills/<name>/SKILL.md`.
 
-### Bash tool
-Command normalization extracts trailing `| head`/`| tail` pipes into structured limits before execution. A configurable interceptor can block commands and redirect the model to a more appropriate tool (e.g., blocking `grep` in favour of the native `grep` tool). Output is truncated to a configurable line limit; full output is written to a session artifact.
+→ [Memory](/memory)
 
-→ [Bash tool runtime](/bash-tool-runtime)
+### Tool runtime details
 
-### Preview/resolve workflow
-`ast_edit` and custom tools can push a `PendingAction` before committing changes. The model calls `resolve` with `action: "apply"` or `"discard"` to finalize. Pending actions form a LIFO stack — multiple preview-producing tools in a single turn resolve in reverse order.
+**Bash** — command normalization extracts trailing `| head`/`| tail` into structured limits. An interceptor can block commands and redirect the model to the appropriate tool. Full output is written to a session artifact; truncated output shown inline.
 
-→ [Resolve tool](/resolve-tool-runtime)
+**Preview/resolve** — `ast_edit` and custom tools push a `PendingAction` before committing. The model calls `resolve(action: "apply" | "discard")` to finalize. Actions form a LIFO stack.
 
-### AST-aware edit (`ast_edit`)
-Structural code rewrites via ast-grep. Operates on parsed AST rather than text, so formatting differences don't affect matches. Supports multi-pattern passes, contextual `sel` mode, and language-scoped rewrites.
+**AST-aware edit** — structural rewrites via ast-grep. Matches AST structure, not text; formatting differences are ignored. Multi-pattern passes, contextual `sel` mode, language-scoped rewrites.
 
-### Notebook tool
-Execute cells in `.ipynb` files directly — edit, insert, or delete cells by index. Backed by the same IPython kernel as the `python` tool.
+**Notebook** — edit, insert, or delete cells in `.ipynb` files by index, backed by the same IPython kernel.
 
-→ [Notebook tool](/notebook-tool-runtime)
+→ [Bash tool](/bash-tool-runtime) · [Resolve tool](/resolve-tool-runtime) · [Notebook tool](/notebook-tool-runtime) · [Custom tools](/custom-tools)
 
----
+### Slash commands
 
-## Configuration & secrets
+Discovered from four providers (`native` → `claude` → `claude-plugins` → `codex`) with priority-ordered deduplication. Commands from higher-priority providers shadow same-named commands from lower ones. Extensions register additional commands at load time.
 
-### Settings hierarchy
-Settings merge across four levels: built-in defaults → user (`~/.pisces/config.json`) → project (`.pisces/config.json`) → environment variables. Project settings are only loaded when `enableProjectConfig` is true.
+Built-in commands include `/tree`, `/branch`, `/handoff`, `/new`, `/fork`, `/resume`, `/continue`, `/model`, `/mcp`, `/memory`, `/marketplace`, `/settings`, `/skill:<name>`, `/export`, `/clear`, `/help`.
 
-### Environment & secrets
-`PI_*` environment variables configure model keys, gateway URLs, and feature flags. The `secrets` subsystem manages OAuth tokens for provider authentication (Anthropic, Google, Amazon) with a pluggable storage backend.
+→ [Slash command internals](/slash-command-internals)
+
+### Configuration
+
+Settings merge across four levels: built-ins → user (`~/.pisces/config.json`) → project (`.pisces/config.json`) → env vars. Config roots scanned in order: `.pisces`, `.claude`, `.codex`, `.gemini`. Project settings gated by `enableProjectConfig`.
 
 → [Configuration](/config-usage) · [Environment variables](/environment-variables) · [Secrets](/secrets)
 
----
+### Models & providers
 
-## LSP integration
-
-11 operations across 40+ language server configurations: `diagnostics`, `definition`, `references`, `hover`, `symbols`, `rename`, `code_actions`, `type_definition`, `implementation`, `status`, `reload`. Format-on-write via `code_actions`. Configurable per-language in project or user settings.
-
----
-
-## Models
-
-Multi-provider with automatic fallback. Supports Anthropic (Claude), Google (Gemini), Amazon Bedrock, and OpenAI-compatible endpoints. `thinkingLevel` controls extended thinking budget per agent. The `/model` command and `set_model` RPC command switch providers live.
+Built-in support for Anthropic (Claude), Google (Gemini), Amazon (Bedrock), OpenAI-compatible endpoints, Azure OpenAI, Groq, Cerebras, xAI, OpenRouter, Kilo, Mistral, z.ai. Provider-level `baseUrl`, `apiKey`, `headers`, and `modelOverrides` are configurable in `models.yml`. `thinkingLevel` controls extended thinking budget per agent. Model roles (`initial`, `smol`, `slow`) separate heavy and lightweight model assignments.
 
 → [Models](/models)
+
+### LSP integration
+
+11 operations: `diagnostics`, `definition`, `references`, `hover`, `symbols`, `rename`, `code_actions`, `type_definition`, `implementation`, `status`, `reload`. 40+ language server configurations built in. Format-on-write via `code_actions`. Disable per-session with `--no-lsp`.
+
+---
+
+## oh-my-pi platform packages
+
+### `@oh-my-pi/pi-ai` — multi-provider streaming
+
+Unified `AssistantMessageEvent` stream across all providers. Every provider normalises to the same event sequence: `start` → content block triplets (`text_start/delta/end`, `thinking_start/delta/end`, `toolcall_start/delta/end`) → terminal `done` or `error`. Delta events are throttled (~50ms batches) before delivery to consumers — TUI and event subscribers see smooth updates regardless of provider stream frequency.
+
+Extended thinking (Anthropic) and structured output (OpenAI responses API) are handled at the provider layer and exposed as first-class events.
+
+→ [Provider streaming internals](/provider-streaming-internals)
+
+### `@oh-my-pi/pi-tui` — differential terminal renderer
+
+Custom terminal UI engine with differential rendering (only changed lines are redrawn), PTY overlays, inline image display (Kitty/iTerm2 protocols), focus management, and cursor marker-based hardware cursor placement. Components implement a simple `render(width): string[]` / `handleInput(data)` contract with no framework dependency.
+
+Theme system drives all color tokens, markdown styling, syntax highlighting palettes, and symbol presets (unicode/nerd/ascii) from a single validated JSON config.
+
+→ [TUI](/tui) · [TUI runtime internals](/tui-runtime-internals) · [Theme](/theme)
+
+### `@oh-my-pi/pi-natives` — Rust N-API core
+
+All performance-critical primitives in a single Rust N-API module. No shelling out.
+
+| Capability | Implementation |
+|---|---|
+| `grep` | Regex search with `.gitignore`, match streaming, context lines |
+| `glob` | Recursive glob with shared FS scan cache |
+| `fuzzyFind` | `fd`-style fuzzy file finder |
+| `pty` | Full PTY — resize, signal, raw/cooked mode |
+| `shell` | Subprocess with merged stdout/stderr, cancellation, timeout |
+| `highlight` | Syntax highlighting to ANSI escape sequences |
+| `text` | `wrapAnsi`, `truncateToWidth`, `sliceWithWidth` — ANSI-aware |
+| `image` | Decode/encode, screenshot HTML→PNG |
+| `clipboard` | Read/write system clipboard |
+
+The FS scan cache (`fs_cache`) is shared across `grep` and `glob`. Directory entries are cached on first read and invalidated when the agent writes to that subtree — subsequent calls skip `readdir` for unchanged directories.
+
+→ [Natives architecture](/natives-architecture) · [Text/search pipeline](/natives-text-search-pipeline) · [Shell/PTY](/natives-shell-pty-process)
+
+### `@oh-my-pi/pi-agent` — agent loop
+
+The core turn loop: build context → call LLM → process tool calls → repeat. Handles tool dispatch, parallel tool execution, result collection, and turn-level abort. Emits typed events (`message_update`, `tool_call`, `tool_result`, `turn_end`, `agent_end`) that `AgentSession` consumes for persistence, TTSR, compaction, and extension hooks.
+
+### `@oh-my-pi/pi-sdk` (AI SDK layer)
+
+Lowest-level provider abstraction. `streamSimple()` maps generic options to the correct provider stream function and returns an `AssistantMessageEventStream`. Handles authentication, base URL overrides, and provider-specific header injection.
+
+---
+
+## Configuration discovery across ecosystems
+
+pisces reads capability items (skills, extensions, hooks, tools, MCP servers, slash commands, context files) from **five** config root ecosystems in priority order:
+
+| Priority | Root | Source |
+|---|---|---|
+| 100 | `~/.pisces/agent/`, `.pisces/` | native |
+| 80 | `~/.claude/`, `.claude/` | claude |
+| 70 | `~/.codex/`, `.codex/` | codex |
+| 70 | `~/.gemini/`, `.gemini/` | gemini |
+| 60 | plugins directory | claude-plugins |
+
+This means any skill, hook, extension, or MCP server installed for Claude Code or Codex is automatically available in pisces at the appropriate priority level. pisces-native config always wins on name collisions.
