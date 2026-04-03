@@ -85,8 +85,11 @@ function sessionNameFor(teamName: string, agentName: string): string {
 
 export class ShoalOrchestrator {
 	#aborted = false;
+	readonly #bridge: ShoalMcpBridge;
 
-	constructor(private bridge: ShoalMcpBridge) {}
+	constructor(bridge: ShoalMcpBridge) {
+		this.#bridge = bridge;
+	}
 
 	abort(): void {
 		this.#aborted = true;
@@ -166,7 +169,7 @@ export class ShoalOrchestrator {
 						emit();
 
 						try {
-							const session = await this.bridge.createSession({
+							const session = await this.#bridge.createSession({
 								name: state.sessionName,
 								path: projectPath,
 								template: agent.template,
@@ -175,7 +178,7 @@ export class ShoalOrchestrator {
 								prompt: agent.prompt,
 							});
 							spawnedSessions.push(session.name);
-							await this.bridge.appendJournal(
+							await this.#bridge.appendJournal(
 								session.name,
 								`[orchestrator] ${correlationId} Team '${def.name}' wave ${waveIdx + 1}: started`,
 							);
@@ -220,7 +223,7 @@ export class ShoalOrchestrator {
 
 				// ── Check for pending action requests before next wave ──────────
 				if (!this.#aborted && !signal?.aborted) {
-					const pendingActions = await this.bridge.listPendingActions({ correlationId });
+					const pendingActions = await this.#bridge.listPendingActions({ correlationId });
 					if (pendingActions.length > 0) {
 						progress.pendingActions = pendingActions;
 						progress.awaitingApproval = true;
@@ -251,7 +254,7 @@ export class ShoalOrchestrator {
 			if (cleanup) {
 				await Promise.allSettled(
 					spawnedSessions.map(sessionName =>
-						this.bridge.killSession(sessionName, { removeWorktree: false }).catch(err =>
+						this.#bridge.killSession(sessionName, { removeWorktree: false }).catch(err =>
 							logger.warn("Failed to kill session on cleanup", {
 								session: sessionName,
 								error: err instanceof Error ? err.message : String(err),
@@ -296,7 +299,7 @@ export class ShoalOrchestrator {
 		while (pending.size > 0 && !this.#aborted && !signal?.aborted) {
 			let snapshot: { sessions: { name: string; status?: string }[] };
 			try {
-				snapshot = await this.bridge.sessionSnapshot([...pending], ["status", "pane"]);
+				snapshot = await this.#bridge.sessionSnapshot([...pending], ["status", "pane"]);
 			} catch (err) {
 				logger.warn("session_snapshot failed", { error: err });
 				await Bun.sleep(pollIntervalMs);
@@ -362,7 +365,7 @@ export class ShoalOrchestrator {
 		while (!this.#aborted && !signal?.aborted) {
 			let pending: SessionActionObject[];
 			try {
-				pending = await this.bridge.listPendingActions({ correlationId });
+				pending = await this.#bridge.listPendingActions({ correlationId });
 			} catch {
 				pending = [];
 			}
