@@ -25,14 +25,14 @@
 </p>
 
 <blockquote>
-<strong>Binary:</strong> <code>pisces</code> (alias: <code>omp</code>)<br>
+TX:<strong>Binary:</strong> <code>pisces</code><br>
 <strong>Upstream:</strong> <a href="https://github.com/can1357/oh-my-pi">can1357/oh-my-pi</a> — sync periodically, changes scoped to <code>src/lobster/</code>, <code>src/modes/print-mode.ts</code>, <code>src/cli/args.ts</code>
 </blockquote>
 
 ---
 
 <!-- Upstream oh-my-pi README follows. Feature documentation applies to pisces. -->
-<!-- CLI invocations use `pisces` (or `omp` alias). -->
+ZK:<!-- CLI invocations use `pisces`. -->
 
 <p align="center">
   <strong>AI coding agent for the terminal</strong>
@@ -111,7 +111,7 @@ Execute Python code with a persistent IPython kernel and rich helper prelude:
 - **Prelude helpers**: File I/O, search, find/replace, line operations, shell, and text utilities built into the kernel
 - **Line operations**: `lines()`, `insert_at()`, `delete_lines()`, `delete_matching()` and related helpers for precise edits
 - **Shared gateway**: Resource-efficient kernel reuse across sessions (`python.sharedGateway` setting)
-- **Custom modules**: Load extensions from `.omp/modules/` and `~/.omp/agent/modules/`
+JK:- **Custom modules**: Load extensions from `.pisces/modules/` and `~/.pisces/agent/modules/`
 - **Rich output**: Supports `display()` for HTML, Markdown, images, and interactive JSON trees
 - **Markdown rendering**: Python cell output with Markdown content renders inline
 - **Mermaid diagrams**: Renders mermaid code blocks as inline graphics in iTerm2/Kitty terminals

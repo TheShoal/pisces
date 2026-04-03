@@ -70,7 +70,7 @@ resumption model without modification.
 ### The AWS Bedrock auto-discovery issue
 
 When `PI_CODING_AGENT_DIR` points to a directory with no `config.yml`,
-omp auto-discovers providers from the environment. With `AWS_BEARER_TOKEN_BEDROCK`
+HT:pisces auto-discovers providers from the environment. With `AWS_BEARER_TOKEN_BEDROCK`
 + `AWS_PROFILE` set, it picks Bedrock as default and uses a non-inference-profile
 model ID that's unsupported. This is **not a pisces bug** — in the lobster sandbox
 a proper `config.yml` is mounted. But pisces should document the required config
@@ -202,7 +202,7 @@ Replace opencode-specific parsing with pisces event schema:
 | `extract_opencode_session_id` | read `.id` from first line |
 | `--format=json` | `--mode json` |
 | `--session=<id>` | `--resume <id>` |
-| `/usr/local/bin/opencode` | `/usr/local/bin/pisces` (or `omp` alias) |
+RJ:| `/usr/local/bin/opencode` | `/usr/local/bin/pisces` |
 
 Pisces `turn_end` event shape (confirmed):
 ```json

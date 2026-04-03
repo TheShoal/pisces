@@ -1,5 +1,5 @@
 {
-	"name": "omp-monorepo",
+	"name": "pisces-monorepo",
 	"private": true,
 	"type": "module",
 	"workspaces": [

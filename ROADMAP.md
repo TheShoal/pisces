@@ -310,8 +310,8 @@ returned to lobster-loop so it can update its thread→session map.
 **Pool sizing and configuration:**
 
 ```bash
-omp --mode grpc --port 50051 --workers 4
-omp --mode grpc --socket /var/run/pisces.sock --workers 2
+NS:pisces --mode grpc --port 50051 --workers 4
+JP:pisces --mode grpc --socket /var/run/pisces.sock --workers 2
 ```
 
 Minimum viable: `--workers 1` (serializes all turns, zero concurrency). Useful
