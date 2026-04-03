@@ -257,7 +257,7 @@ const UNICODE_SYMBOLS: SymbolMap = {
 	"icon.context": "◫",
 	"icon.cost": "💲",
 	"icon.time": "⏱",
-	"icon.pi": "󰪄  ",
+	"icon.pi": "󰪄  ",
 	"icon.agents": "👥",
 	"icon.cache": "💾",
 	"icon.input": "⤵",

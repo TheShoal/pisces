@@ -67,7 +67,7 @@ export class WelcomeComponent implements Component {
 		const leftCol = showRightColumn ? dualLeftCol : boxWidth - 2;
 		const rightCol = showRightColumn ? dualRightCol : 0;
 
-	// Block-based pisces logo (gradient: magenta → cyan)
+		// Block-based pisces logo (gradient: magenta → cyan)
 		// biome-ignore format: preserve ASCII art layout
 		const piLogo = ["  ><))°>    ", "    <°((><  ", "            ", "  ><))°>    ", "    <°((><  "];
 
