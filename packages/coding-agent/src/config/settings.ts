@@ -409,6 +409,7 @@ export class Settings {
 
 		// Apply preset defaults (before rebuilding merged view)
 		this.#applyPreset();
+		this.#applyEnvOverrides();
 
 		// Build merged view
 		this.#rebuildMerged();
@@ -443,6 +444,15 @@ export class Settings {
 			) {
 				setByPath(this.#overrides, segments, value);
 			}
+		}
+	}
+
+	#applyEnvOverrides(): void {
+		// PISCES_LSP=1 enables LSP; PISCES_LSP=0 disables it
+		if (Bun.env.PISCES_LSP === "1") {
+			setByPath(this.#overrides, parsePath("lsp.enabled"), true);
+		} else if (Bun.env.PISCES_LSP === "0") {
+			setByPath(this.#overrides, parsePath("lsp.enabled"), false);
 		}
 	}
 

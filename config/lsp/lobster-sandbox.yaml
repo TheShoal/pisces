@@ -1,0 +1,58 @@
+# LSP configuration for the lobster sandbox rootfs.
+#
+# Language servers are expected to be installed in the sandbox image.
+# Paths use standard system locations; local node_modules/.bin is also checked
+# by the LSP config resolver via rootMarker-based local bin resolution.
+#
+# Set PISCES_LSP=1 to enable LSP inside lobster-loop sandbox turns.
+
+servers:
+  typescript-language-server:
+    command: typescript-language-server
+    args:
+      - --stdio
+    fileTypes:
+      - .ts
+      - .tsx
+      - .js
+      - .jsx
+      - .mjs
+      - .cjs
+    rootMarkers:
+      - package.json
+      - tsconfig.json
+      - jsconfig.json
+    initOptions:
+      hostInfo: pisces-lobster
+      preferences:
+        includeInlayParameterNameHints: all
+        includeInlayVariableTypeHints: true
+        includeInlayFunctionParameterTypeHints: true
+
+  pyright:
+    command: pyright-langserver
+    args:
+      - --stdio
+    fileTypes:
+      - .py
+    rootMarkers:
+      - pyproject.toml
+      - setup.py
+      - setup.cfg
+      - pyrightconfig.json
+
+  rust-analyzer:
+    command: rust-analyzer
+    args: []
+    fileTypes:
+      - .rs
+    rootMarkers:
+      - Cargo.toml
+      - rust-analyzer.toml
+    initOptions: {}
+    settings: {}
+    capabilities:
+      flycheck: true
+      ssr: true
+      expandMacro: true
+      runnables: true
