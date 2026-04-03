@@ -4,11 +4,11 @@ import { defineConfig } from "vitepress";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
-	title: "oh my pi",
+	title: "pisces",
 	description: "AI coding agent for the terminal",
 	srcDir: "../../docs",
 	outDir: "../../dist/docs-site",
-	base: "/oh-my-pi/",
+	base: "/pisces/",
 	ignoreDeadLinks: [/\.\.\/packages\//],
 
 
@@ -23,12 +23,12 @@ export default defineConfig({
 	},
 
 	head: [
-		["link", { rel: "icon", href: "/oh-my-pi/icon.svg", type: "image/svg+xml" }],
+		["link", { rel: "icon", href: "/pisces/icon.svg", type: "image/svg+xml" }],
 	],
 
 	themeConfig: {
 		logo: "/icon.svg",
-		siteTitle: "oh my pi",
+		siteTitle: "pisces",
 
 		nav: [
 			{ text: "Guide", link: "/session" },
@@ -36,7 +36,7 @@ export default defineConfig({
 			{ text: "SDK", link: "/sdk" },
 			{
 				text: "GitHub",
-				link: "https://github.com/can1357/oh-my-pi",
+				link: "https://github.com/usm-ricardoroche/pisces",
 			},
 		],
 
