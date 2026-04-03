@@ -24,6 +24,54 @@ All items tracked in PLAN.md.
 - Structured error JSON on exit code 1
 - Validate `--session-dir` is fully wired end-to-end (flag is parsed but wiring to session storage needs verification)
 
+## Embedder-grade platform hardening (next major arc)
+
+> Start with Epic 1 and Epic 2. Epic 3 is designed alongside Epic 2 because budget enforcement depends on the same usage and telemetry plumbing.
+
+> Design doc: [docs/verified-task-execution-observability.md](docs/verified-task-execution-observability.md)
+
+### Epic 1. Verified isolated task execution (P0) — DONE
+
+- Added first-class verification policies to isolated `task` runs.
+- Applies the subagent patch inside the isolated workspace, runs LSP and/or command checks, returns structured `VerificationResult` with attempt metadata.
+- Persists per-attempt logs as artifacts (`${taskId}.verify.a${n}-${i}-${name}.log`).
+- One bounded repair retry driven by `task-verification-repair.md` prompt with failure context.
+- Six new `AgentSessionEvent` types: `subagent_start`, `subagent_end`, `subagent_verification_start`, `subagent_verification_end`, `subagent_repair_start`, `subagent_repair_end`.
+- `docs/rpc.md` updated with verification param shapes and event schemas.
+
+### Epic 2. Standard telemetry bridge (P0) — DONE
+
+- `RuntimeTelemetryAdapter` interface + `NoopTelemetryAdapter` default (no-op unless configured).
+- `OtelTelemetryAdapter`: pure OTLP/JSON over HTTP, no `@opentelemetry/*` SDK dependency.
+- Full span hierarchy: `pisces.session > pisces.turn > pisces.tool_call`; also `pisces.auto_retry`, `pisces.auto_compaction`, `pisces.ttsr_interrupt`, `pisces.subagent_run > pisces.subagent_verification > pisces.subagent_verification.command`.
+- `AgentSessionEvent` union enriched: `TurnStartEvent` (with `turnIndex`/`timestamp`), `TurnEndEvent`, `AgentEndEvent` (with `sessionId`/`sessionFile`).
+- `#emitExtensionEvent` now returns enriched event so adapter receives fully-populated spans.
+- `getAdapter().onEvent(event)` called from `#emit`; `getAdapter().shutdown()` called from `dispose()`.
+- Three new settings: `telemetry.enabled`, `telemetry.endpoint`, `telemetry.serviceName`.
+- Adapter initialized from settings in `sdk.ts` when `telemetry.enabled = true`.
+
+### Epic 3. Budget policy and enforcement (P0.5)
+
+- Add hard caps for spend, tokens, wall time, tool calls, and subagent fanout.
+- Surface budget burn and structured budget-exceeded reasons through RPC, SDK subscriptions, and stats.
+- Implement this on top of Epic 2's shared usage instrumentation so enforcement and observability use the same source of truth.
+
+### Epic 4. Hybrid repo retrieval (P1)
+
+- Build a retrieval pipeline that combines `grep`, `ast_grep`, `lsp`, and optional semantic reranking.
+- Keep deterministic candidate generation as the default; semantic ranking reranks candidates instead of replacing structural search.
+- Return provenance-scored hits rather than opaque vector-only results.
+
+### Epic 5. Session replay inspector (P1)
+
+- Expose session tree movement, branch summaries, tool timelines, TTSR injections, retries, and compactions as replayable structured data.
+- Ship the headless inspection layer first; UI visualizers remain a thin consumer on top of the same replay model.
+
+### Epic 6. Vision-assisted UI triage (P2)
+
+- Build a workflow that combines screenshot/image inputs, browser observation, and repo retrieval to map visual bugs to likely components and files.
+- Treat this as an extension/workflow layer built on top of existing blob, artifact, browser, and image-inspection primitives.
+
 ---
 
 ## Session finalization — corrected understanding
