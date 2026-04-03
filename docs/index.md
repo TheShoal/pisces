@@ -6,7 +6,7 @@ hero:
   text: A coding agent built for embedding
   tagline: RPC-first · session trees · zero-cost rules · Rust-native core
   image:
-    src: /pisces/hero-dark.png
+    src: /hero-dark.png
     alt: pisces terminal screenshot
   actions:
     - theme: brand
