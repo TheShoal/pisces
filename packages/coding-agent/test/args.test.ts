@@ -330,4 +330,31 @@ describe("parseArgs", () => {
 			expect(result.messages).toEqual(["Do the task"]);
 		});
 	});
+
+	describe("pisces-specific flags", () => {
+		test("parses --no-provider-discovery", () => {
+			const result = parseArgs(["--no-provider-discovery"]);
+			expect(result.noProviderDiscovery).toBe(true);
+		});
+
+		test("--no-provider-discovery defaults false", () => {
+			const result = parseArgs([]);
+			expect(result.noProviderDiscovery).toBeFalsy();
+		});
+
+		test("parses --agent with name", () => {
+			const result = parseArgs(["--agent", "plan"]);
+			expect(result.agent).toBe("plan");
+		});
+
+		test("parses --session-dir with path", () => {
+			const result = parseArgs(["--session-dir", "/var/pisces/sessions"]);
+			expect(result.sessionDir).toBe("/var/pisces/sessions");
+		});
+
+		test("parses --list-sessions flag", () => {
+			const result = parseArgs(["--list-sessions"]);
+			expect(result.listSessions).toBe(true);
+		});
+	});
 });
