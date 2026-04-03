@@ -3,7 +3,7 @@
  */
 
 import { THINKING_EFFORTS } from "@oh-my-pi/pi-ai";
-import { APP_NAME } from "@oh-my-pi/pi-utils";
+import { APP_NAME, CONFIG_DIR_NAME } from "@oh-my-pi/pi-utils";
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { parseArgs } from "../cli/args";
 import { runRootCommand } from "../main";
@@ -129,13 +129,22 @@ export default class Index extends Command {
 		`# Continue previous session\n  ${APP_NAME} --continue "What did we discuss?"`,
 		`# Use different model (fuzzy matching)\n  ${APP_NAME} --model opus "Help me refactor this code"`,
 		`# Limit model cycling to specific models\n  ${APP_NAME} --models claude-sonnet,claude-haiku,gpt-4o`,
-		`# Export a session file to HTML\n  ${APP_NAME} --export ~/.omp/agent/sessions/--path--/session.jsonl`,
+		`# Export a session file to HTML\n  ${APP_NAME} --export ~/${CONFIG_DIR_NAME}/agent/sessions/--path--/session.jsonl`,
 	];
 
 	static strict = false;
 
 	async run(): Promise<void> {
 		const parsed = parseArgs(this.argv);
-		await runRootCommand(parsed, this.argv);
+		try {
+			await runRootCommand(parsed, this.argv);
+		} catch (err) {
+			if (parsed.mode === "json") {
+				const message = err instanceof Error ? err.message : String(err);
+				process.stdout.write(`${JSON.stringify({ type: "error", code: "STARTUP_ERROR", message })}\n`);
+				process.exit(1);
+			}
+			throw err;
+		}
 	}
 }

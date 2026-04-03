@@ -20,7 +20,7 @@ import { buildInitialMessage } from "./cli/initial-message";
 import { listModels } from "./cli/list-models";
 import { selectSession } from "./cli/session-picker";
 import { findConfigFile } from "./config";
-import { ModelRegistry, ModelsConfigFile } from "./config/model-registry";
+import { ModelRegistry } from "./config/model-registry";
 import { resolveCliModel, resolveModelRoleValue, resolveModelScope, type ScopedModel } from "./config/model-resolver";
 import { Settings, settings } from "./config/settings";
 import { initializeWithSettings } from "./discovery";
@@ -518,8 +518,7 @@ async function buildSessionOptions(
 	if (parsed.agent) {
 		const agentDef = getBundledAgent(parsed.agent);
 		if (!agentDef) {
-			process.stderr.write(`Unknown agent: ${parsed.agent}. Run 'omp agents unpack' to see available agents.\n`);
-			process.exit(1);
+			throw new Error(`Unknown agent: ${parsed.agent}. Run 'omp agents unpack' to see available agents.`);
 		}
 		const agentPrompt = agentDef.systemPrompt;
 		const existing = options.systemPrompt;
@@ -544,6 +543,19 @@ async function buildSessionOptions(
 	}
 
 	return { options };
+}
+
+/**
+ * Exits with code 1. In JSON mode, emits a structured error event to stdout
+ * so harnesses can distinguish error types without parsing stderr.
+ */
+function fatalError(jsonMode: boolean, code: string, message: string): never {
+	if (jsonMode) {
+		process.stdout.write(`${JSON.stringify({ type: "error", code, message })}\n`);
+	} else {
+		process.stderr.write(`${chalk.red(`Error: ${message}`)}\n`);
+	}
+	process.exit(1);
 }
 
 export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<void> {
@@ -780,10 +792,11 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	// Handle CLI --api-key as runtime override (not persisted)
 	if (parsedArgs.apiKey) {
 		if (!sessionOptions.model && !sessionOptions.modelPattern) {
-			process.stderr.write(
-				`${chalk.red("--api-key requires a model to be specified via --model, --provider/--model, or --models")}\n`,
+			fatalError(
+				mode === "json",
+				"INVALID_ARG",
+				"--api-key requires a model to be specified via --model, --provider/--model, or --models",
 			);
-			process.exit(1);
 		}
 		if (sessionOptions.model) {
 			authStorage.setRuntimeApiKey(sessionOptions.model.provider, parsedArgs.apiKey);
@@ -833,15 +846,10 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	}
 
 	if (!isInteractive && !session.model) {
-		if (modelFallbackMessage) {
-			process.stderr.write(`${chalk.red(modelFallbackMessage)}\n`);
-		} else {
-			process.stderr.write(`${chalk.red("No models available.")}\n`);
-		}
-		process.stderr.write(`${chalk.yellow("\nSet an API key environment variable:")}\n`);
-		process.stderr.write("  ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, etc.\n");
-		process.stderr.write(`${chalk.yellow(`\nOr create ${ModelsConfigFile.path()}`)}\n`);
-		process.exit(1);
+		const noModelMsg =
+			(modelFallbackMessage ?? "No models available.") +
+			"\nSet an API key environment variable: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, etc.";
+		fatalError(mode === "json", "NO_MODEL", noModelMsg);
 	}
 
 	if (mode === "rpc") {
