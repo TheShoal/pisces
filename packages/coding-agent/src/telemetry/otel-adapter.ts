@@ -130,6 +130,7 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 
 	#traceId: string = newTraceId();
 	#sessionSpanId: string | undefined;
+	#currentTurnKey: string | undefined;
 
 	/** Open spans keyed by their logical key. */
 	readonly #openSpans = new Map<string, ActiveSpan>();
@@ -176,10 +177,12 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 				this.#startSpan(`turn:${event.turnIndex}`, "pisces.turn", "session", {
 					[Attr.TURN_INDEX]: event.turnIndex,
 				});
+				this.#currentTurnKey = `turn:${event.turnIndex}`;
 				break;
 
 			case "turn_end":
 				this.#closeSpan(`turn:${event.turnIndex}`, "ok");
+				if (this.#currentTurnKey === `turn:${event.turnIndex}`) this.#currentTurnKey = undefined;
 				break;
 
 			// Tool calls
@@ -373,11 +376,9 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 	}
 
 	/** Returns the key of the most-recently-opened turn span, or "session". */
+	/** Returns the key of the most-recently-opened turn span, or "session". */
 	#activeTurnKey(): string {
-		for (const key of this.#openSpans.keys()) {
-			if (key.startsWith("turn:")) return key;
-		}
-		return "session";
+		return this.#currentTurnKey ?? "session";
 	}
 
 	// -------------------------------------------------------------------------

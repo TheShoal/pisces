@@ -11,6 +11,8 @@ import { logger } from "@oh-my-pi/pi-utils";
 import { Type } from "@sinclair/typebox";
 import { $ } from "bun";
 import type { ToolDefinition } from "../extensibility/extensions/types";
+import memorySearchDescription from "./prompts/memory-search.md" with { type: "text" };
+import messageUserDescription from "./prompts/message-user.md" with { type: "text" };
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -19,7 +21,7 @@ function getMajordomoSocket(): string {
 	const sock = Bun.env.PISCES_MAJORDOMO_SOCKET ?? Bun.env.MAJORDOMO_SOCKET;
 	if (!sock) {
 		throw new Error(
-			"PISCES_MAJORDOMO_SOCKET is not set. " + "The lobster extension requires a majordomo-do sidecar socket.",
+			"PISCES_MAJORDOMO_SOCKET is not set. The lobster extension requires a majordomo-do sidecar socket.",
 		);
 	}
 	return sock;
@@ -30,7 +32,7 @@ function getRunChannelKey(): string {
 	const key = Bun.env.PISCES_RUN_CHANNEL_KEY ?? Bun.env.RUN_CHANNEL_KEY;
 	if (!key) {
 		throw new Error(
-			"PISCES_RUN_CHANNEL_KEY is not set. " + "The lobster extension requires a run-channel key to route messages.",
+			"PISCES_RUN_CHANNEL_KEY is not set. The lobster extension requires a run-channel key to route messages.",
 		);
 	}
 	return key;
@@ -40,9 +42,10 @@ function getRunChannelKey(): string {
 
 const RETRY_DELAYS_MS = [500, 1000, 2000];
 
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, label: string, signal?: AbortSignal): Promise<T> {
 	let lastError: unknown;
 	for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+		if (signal?.aborted) throw signal.reason ?? new Error(`${label} aborted`);
 		try {
 			return await fn();
 		} catch (err) {
@@ -66,25 +69,27 @@ const MessageUserParams = Type.Object({
 export const messageUserTool: ToolDefinition<typeof MessageUserParams> = {
 	name: "messageUser",
 	label: "Message User",
-	description:
-		"Send a message directly to the user through the lobster chat interface. " +
-		"Use this to ask clarifying questions, request information, or provide status updates " +
-		"that should appear in the user-facing conversation.",
+	description: messageUserDescription.trim(),
 	parameters: MessageUserParams,
 
-	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+	async execute(_toolCallId, params, signal, _onUpdate, _ctx) {
 		const socket = getMajordomoSocket();
 		const channelKey = getRunChannelKey();
-		const result = await withRetry(async () => {
-			const res =
-				await $`majordomo-do --socket ${socket} --run-channel-key ${channelKey} --message-user-text ${params.text}`
-					.quiet()
-					.nothrow();
-			if (res.exitCode !== 0) {
-				throw new Error(res.stderr.toString().trim() || `majordomo-do exited with code ${res.exitCode}`);
-			}
-			return res.text().trim();
-		}, "messageUser");
+		const result = await withRetry(
+			async () => {
+				if (signal?.aborted) throw signal.reason ?? new Error("messageUser aborted");
+				const res =
+					await $`majordomo-do --socket ${socket} --run-channel-key ${channelKey} --message-user-text ${params.text}`
+						.quiet()
+						.nothrow();
+				if (res.exitCode !== 0) {
+					throw new Error(res.stderr.toString().trim() || `majordomo-do exited with code ${res.exitCode}`);
+				}
+				return res.text().trim();
+			},
+			"messageUser",
+			signal,
+		);
 
 		return {
 			content: [{ type: "text", text: result || "Message sent." }],
@@ -108,25 +113,27 @@ const MemorySearchParams = Type.Object({
 export const memorySearchTool: ToolDefinition<typeof MemorySearchParams> = {
 	name: "memorySearch",
 	label: "Memory Search",
-	description:
-		"Search the QMD (query memory database) for relevant context from past interactions, " +
-		"stored facts, and indexed project knowledge. " +
-		"Returns ranked results from the memory store.",
+	description: memorySearchDescription.trim(),
 	parameters: MemorySearchParams,
 
-	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+	async execute(_toolCallId, params, signal, _onUpdate, _ctx) {
 		const socket = getMajordomoSocket();
-		const results = await withRetry(async () => {
-			const args: string[] = ["--socket", socket, "--command-id", "qmd.query"];
-			if (params.query) args.push("--query", params.query);
-			if (params.limit !== undefined) args.push("--limit", String(params.limit));
+		const results = await withRetry(
+			async () => {
+				if (signal?.aborted) throw signal.reason ?? new Error("memorySearch aborted");
+				const args: string[] = ["--socket", socket, "--command-id", "qmd.query"];
+				if (params.query) args.push("--query", params.query);
+				if (params.limit !== undefined) args.push("--limit", String(params.limit));
 
-			const res = await $`majordomo-do ${args}`.quiet().nothrow();
-			if (res.exitCode !== 0) {
-				throw new Error(res.stderr.toString().trim() || `majordomo-do exited with code ${res.exitCode}`);
-			}
-			return res.text().trim();
-		}, "memorySearch");
+				const res = await $`majordomo-do ${args}`.quiet().nothrow();
+				if (res.exitCode !== 0) {
+					throw new Error(res.stderr.toString().trim() || `majordomo-do exited with code ${res.exitCode}`);
+				}
+				return res.text().trim();
+			},
+			"memorySearch",
+			signal,
+		);
 
 		return {
 			content: [{ type: "text", text: results || "No results found." }],

@@ -46,6 +46,8 @@ export class BudgetController {
 	readonly #warnedDimensions = new Set<BudgetViolationReason>();
 	// Track whether exceeded event has fired (fire only once)
 	#exceededFired = false;
+	// Periodic wall-time enforcement
+	#wallTimeTimer: NodeJS.Timeout | undefined;
 
 	constructor(
 		policy: RunBudgetPolicy,
@@ -66,6 +68,17 @@ export class BudgetController {
 		switch (event.type) {
 			case "agent_start":
 				this.#startTimeMs = Date.now();
+				if (this.#policy.maxWallTimeMs !== undefined) {
+					const intervalMs = Math.min(5_000, Math.ceil(this.#policy.maxWallTimeMs / 10));
+					this.#wallTimeTimer = setInterval(() => this.#checkThresholds(), intervalMs);
+				}
+				break;
+
+			case "agent_end":
+				if (this.#wallTimeTimer) {
+					clearInterval(this.#wallTimeTimer);
+					this.#wallTimeTimer = undefined;
+				}
 				break;
 
 			case "turn_end": {
@@ -165,6 +178,10 @@ export class BudgetController {
 
 		if (snapshot.status === "exceeded" && !this.#exceededFired) {
 			this.#exceededFired = true;
+			if (this.#wallTimeTimer) {
+				clearInterval(this.#wallTimeTimer);
+				this.#wallTimeTimer = undefined;
+			}
 			this.#emit({ type: "budget_exceeded", scope: this.#scope, snapshot });
 			return;
 		}

@@ -1,0 +1,1 @@
+Send a message directly to the user through the lobster chat interface. Use this to ask clarifying questions, request information, or provide status updates that should appear in the user-facing conversation.
