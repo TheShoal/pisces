@@ -1,14 +1,14 @@
 /**
- * Centralized path helpers for omp config directories.
+ * Centralized path helpers for pisces config directories.
  *
- * Uses PI_CONFIG_DIR (default ".omp") for the config root and
+ * Uses PI_CONFIG_DIR (default ".pisces") for the config root and
  * PI_CODING_AGENT_DIR to override the agent directory.
  *
  * On Linux, if XDG_DATA_HOME / XDG_STATE_HOME / XDG_CACHE_HOME environment
  * variables are set, paths are redirected to XDG-compliant locations under
- * $XDG_*_HOME/omp/. This requires running `omp config migrate` first to
+ * $XDG_*_HOME/pisces/. This requires running `pisces config migrate` first to
  * move data to the new locations. No filesystem existence checks are performed
- * — if the env var is set, omp trusts that the migration has been done.
+ * — if the env var is set, pisces trusts that the migration has been done.
  */
 
 import * as fs from "node:fs";
@@ -16,11 +16,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { engines, version } from "../package.json" with { type: "json" };
 
-/** App name (e.g. "omp" or "pisces") */
-export const APP_NAME: string = typeof PI_APP_NAME !== "undefined" ? PI_APP_NAME : "omp";
+/** App name (e.g. "pisces") */
+export const APP_NAME: string = typeof PI_APP_NAME !== "undefined" ? PI_APP_NAME : "pisces";
 
-/** Config directory name (e.g. ".omp" or ".pisces") */
-export const CONFIG_DIR_NAME: string = typeof PI_CONFIG_DIR_NAME !== "undefined" ? PI_CONFIG_DIR_NAME : ".omp";
+/** Config directory name (e.g. ".pisces") */
+export const CONFIG_DIR_NAME: string = typeof PI_CONFIG_DIR_NAME !== "undefined" ? PI_CONFIG_DIR_NAME : ".pisces";
 
 /** Version (e.g. "1.0.0") */
 export const VERSION: string = version;
@@ -89,12 +89,12 @@ export function setProjectDir(dir: string): void {
 	process.chdir(projectDir);
 }
 
-/** Get the config directory name relative to home (e.g. ".omp" or PI_CONFIG_DIR override). */
+/** Get the config directory name relative to home (e.g. ".pisces" or PI_CONFIG_DIR override). */
 export function getConfigDirName(): string {
 	return process.env.PI_CONFIG_DIR || CONFIG_DIR_NAME;
 }
 
-/** Get the config agent directory name relative to home (e.g. ".omp/agent" or PI_CONFIG_DIR + "/agent"). */
+/** Get the config agent directory name relative to home (e.g. ".pisces/agent" or PI_CONFIG_DIR + "/agent"). */
 export function getConfigAgentDirName(): string {
 	return `${getConfigDirName()}/agent`;
 }
@@ -106,8 +106,8 @@ export function getConfigAgentDirName(): string {
 type XdgCategory = "data" | "state" | "cache";
 
 /**
- * Resolves and caches all omp directory paths. On Linux, when XDG environment
- * variables are set, paths are redirected under $XDG_*_HOME/omp/. A new
+ * Resolves and caches all pisces directory paths. On Linux, when XDG environment
+ * variables are set, paths are redirected under $XDG_*_HOME/pisces/. A new
  * instance is created whenever the agent directory changes, which naturally
  * invalidates all cached paths.
  */
@@ -158,7 +158,7 @@ class DirResolver {
 			state: xdgState ?? this.configRoot,
 			cache: xdgCache ?? this.configRoot,
 		};
-		// XDG flattens the agent/ prefix: ~/.omp/agent/sessions → $XDG_DATA_HOME/omp/sessions
+		// XDG flattens the agent/ prefix: ~/.pisces/agent/sessions → $XDG_DATA_HOME/pisces/sessions
 		this.#agentDirs = {
 			data: xdgData ?? this.agentDir,
 			state: xdgState ?? this.agentDir,
@@ -196,7 +196,7 @@ let dirs = new DirResolver(process.env.PI_CODING_AGENT_DIR);
 // Root directories
 // =============================================================================
 
-/** Get the config root directory (~/.omp). */
+/** Get the config root directory (~/.pisces). */
 export function getConfigRootDir(): string {
 	return dirs.configRoot;
 }
@@ -207,12 +207,12 @@ export function setAgentDir(dir: string): void {
 	process.env.PI_CODING_AGENT_DIR = dir;
 }
 
-/** Get the agent config directory (~/.omp/agent). */
+/** Get the agent config directory (~/.pisces/agent). */
 export function getAgentDir(): string {
 	return dirs.agentDir;
 }
 
-/** Get the project-local config directory (.omp). */
+/** Get the project-local config directory (.pisces). */
 export function getProjectAgentDir(cwd: string = getProjectDir()): string {
 	return path.join(cwd, CONFIG_DIR_NAME);
 }

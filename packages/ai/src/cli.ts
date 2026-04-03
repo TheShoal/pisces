@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import * as readline from "node:readline";
+import { getAgentDbPath } from "@oh-my-pi/pi-utils";
 import { AuthCredentialStore } from "./auth-storage";
 import { getOAuthProviders } from "./utils/oauth";
 import { loginAnthropic } from "./utils/oauth/anthropic";
@@ -20,6 +21,11 @@ import { loginZai } from "./utils/oauth/zai";
 import { loginZenMux } from "./utils/oauth/zenmux";
 
 const PROVIDERS = getOAuthProviders();
+
+function formatHomePath(target: string): string {
+	const home = Bun.env.HOME ?? process.env.HOME;
+	return home ? target.replace(home, "~") : target;
+}
 
 function prompt(rl: readline.Interface, question: string): Promise<string> {
 	const { promise, resolve, reject } = Promise.withResolvers<string>();
@@ -174,7 +180,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 			case "tavily": {
@@ -190,7 +196,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 			case "parallel": {
@@ -206,7 +212,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 
@@ -234,7 +240,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 
@@ -251,7 +257,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 
@@ -268,7 +274,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 			case "minimax-code": {
@@ -284,7 +290,7 @@ async function login(provider: OAuthProvider): Promise<void> {
 					},
 				});
 				storage.saveApiKey(provider, apiKey);
-				console.log(`\nAPI key saved to ~/.omp/agent/agent.db`);
+				console.log(`\nAPI key saved to ${formatHomePath(getAgentDbPath())}`);
 				return;
 			}
 

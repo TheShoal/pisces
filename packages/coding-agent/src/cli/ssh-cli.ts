@@ -4,7 +4,7 @@
  * Handles `omp ssh <command>` subcommands for SSH host configuration management.
  */
 
-import { getSSHConfigPath } from "@oh-my-pi/pi-utils";
+import { APP_NAME, getConfigDirName, getSSHConfigPath } from "@oh-my-pi/pi-utils";
 import chalk from "chalk";
 import { addSSHHost, readSSHConfigFile, removeSSHHost, type SSHHostConfig } from "../ssh/config-writer";
 
@@ -144,12 +144,12 @@ async function handleList(cmd: SSHCommandArgs): Promise<void> {
 
 	if (!hasProject && !hasUser) {
 		process.stdout.write(chalk.dim("No SSH hosts configured\n"));
-		process.stdout.write(chalk.dim("Add one with: omp ssh add <name> --host <address>\n"));
+		process.stdout.write(chalk.dim(`Add one with: ${APP_NAME} ssh add <name> --host <address>\n`));
 		return;
 	}
 
 	if (hasProject) {
-		process.stdout.write(chalk.bold("Project SSH Hosts (.omp/ssh.json):\n"));
+		process.stdout.write(chalk.bold(`Project SSH Hosts (${getConfigDirName()}/ssh.json):\n`));
 		printHosts(projectHosts);
 	}
 
@@ -158,7 +158,7 @@ async function handleList(cmd: SSHCommandArgs): Promise<void> {
 	}
 
 	if (hasUser) {
-		process.stdout.write(chalk.bold("User SSH Hosts (~/.omp/agent/ssh.json):\n"));
+		process.stdout.write(chalk.bold(`User SSH Hosts (~/${getConfigDirName()}/agent/ssh.json):\n`));
 		printHosts(userHosts);
 	}
 }

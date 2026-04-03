@@ -26,13 +26,13 @@ describe("createAgentSession skills option", () => {
 
 	beforeEach(() => {
 		tempDir = path.join(os.tmpdir(), `pi-sdk-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-		// Create skill in .omp/skills/ for native project-level discovery
-		skillsDir = path.join(tempDir, ".omp", "skills", "test-skill");
+		// Create skill in .pisces/skills/ for native project-level discovery
+		skillsDir = path.join(tempDir, ".pisces", "skills", "test-skill");
 		fs.mkdirSync(skillsDir, { recursive: true });
 		originalHome = process.env.HOME;
 		tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-sdk-home-"));
 		process.env.HOME = tempHomeDir;
-		const nativeUserSkillsDir = path.join(tempHomeDir, ".omp", "agent", "skills");
+		const nativeUserSkillsDir = path.join(tempHomeDir, ".pisces", "agent", "skills");
 		fs.mkdirSync(nativeUserSkillsDir, { recursive: true });
 
 		// Create a test skill in the pi skills directory
@@ -86,6 +86,9 @@ Loaded via symbolic link.
 			agentDir: tempDir,
 			sessionManager: SessionManager.inMemory(),
 			settings: createIsolatedSkillsSettings(),
+			disableExtensionDiscovery: true,
+			enableMCP: false,
+			enableLsp: false,
 		});
 
 		// Skills should be discovered and exposed on the session
@@ -99,13 +102,16 @@ Loaded via symbolic link.
 			agentDir: tempDir,
 			sessionManager: SessionManager.inMemory(),
 			settings: createIsolatedSkillsSettings(),
+			disableExtensionDiscovery: true,
+			enableMCP: false,
+			enableLsp: false,
 		});
 
 		expect(session.skills.some((s: Skill) => s.name === "symlinked-skill")).toBe(true);
 	});
 
 	it("should still discover project skills when user skills directory is missing", async () => {
-		const userAgentDir = path.join(tempHomeDir, ".omp", "agent");
+		const userAgentDir = path.join(tempHomeDir, ".pisces", "agent");
 		fs.rmSync(path.join(userAgentDir, "skills"), { recursive: true, force: true });
 		fs.writeFileSync(path.join(userAgentDir, "placeholder.txt"), "placeholder");
 
@@ -114,6 +120,9 @@ Loaded via symbolic link.
 			agentDir: tempDir,
 			sessionManager: SessionManager.inMemory(),
 			settings: createIsolatedSkillsSettings(),
+			disableExtensionDiscovery: true,
+			enableMCP: false,
+			enableLsp: false,
 		});
 
 		expect(session.skills.some((s: Skill) => s.name === "test-skill")).toBe(true);
@@ -125,6 +134,9 @@ Loaded via symbolic link.
 			sessionManager: SessionManager.inMemory(),
 			skills: [], // Explicitly empty - like --no-skills
 			settings: createIsolatedSkillsSettings(),
+			disableExtensionDiscovery: true,
+			enableMCP: false,
+			enableLsp: false,
 		});
 
 		// session.skills should be empty
@@ -148,6 +160,9 @@ Loaded via symbolic link.
 			sessionManager: SessionManager.inMemory(),
 			skills: [customSkill],
 			settings: createIsolatedSkillsSettings(),
+			disableExtensionDiscovery: true,
+			enableMCP: false,
+			enableLsp: false,
 		});
 
 		// session.skills should contain only the provided skill

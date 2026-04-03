@@ -5,7 +5,7 @@
  * modify the system prompt based on extension state.
  *
  * Usage:
- * 1. Copy this file to ~/.omp/agent/extensions/ (legacy: ~/.pi/agent/extensions/) or your project's .omp/extensions/
+ * 1. Copy this file to ~/.pisces/agent/extensions/ (legacy: ~/.omp/agent/extensions/, ~/.pi/agent/extensions/) or your project's .pisces/extensions/
  * 2. Use /pirate to toggle pirate mode
  * 3. When enabled, the agent will respond like a pirate
  */

@@ -8,7 +8,7 @@ import type { AgentEvent, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { SearchDb } from "@oh-my-pi/pi-natives";
 import { logger, untilAborted } from "@oh-my-pi/pi-utils";
 import type { TSchema } from "@sinclair/typebox";
-import Ajv, { type ValidateFunction } from "ajv";
+import Ajv, { type AnySchema, type ValidateFunction } from "ajv";
 import { ModelRegistry } from "../config/model-registry";
 import { resolveModelOverride } from "../config/model-resolver";
 import { type PromptTemplate, renderPromptTemplate } from "../config/prompt-templates";
@@ -182,7 +182,7 @@ function buildOutputValidator(schema: unknown): { validate?: ValidateFunction; e
 	if (normalized === undefined) return {};
 	const jsonSchema = jtdToJsonSchema(normalized);
 	try {
-		return { validate: ajv.compile(jsonSchema as any) };
+		return { validate: ajv.compile(jsonSchema as AnySchema) };
 	} catch (err) {
 		return { error: err instanceof Error ? err.message : String(err) };
 	}

@@ -179,9 +179,10 @@ export function registerTeamCommand(pi: ExtensionAPI): void {
 			"Returns the action ID; include it in your journal or handoff notes.",
 		parameters: RequestActionParams,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const bridge = new ShoalMcpBridge();
+			const sharedBridge = activeRun?.bridge;
+			const bridge = sharedBridge ?? new ShoalMcpBridge();
 			try {
-				await bridge.connect();
+				if (!sharedBridge) await bridge.connect();
 				const result = await bridge.requestAction({
 					requesterSession: params.requester_session,
 					actionType: params.action_type,
@@ -197,7 +198,7 @@ export function registerTeamCommand(pi: ExtensionAPI): void {
 				ctx.ui.notify(msg, "error");
 				return { content: [{ type: "text", text: msg }] };
 			} finally {
-				await bridge.disconnect().catch(() => {});
+				if (!sharedBridge) await bridge.disconnect().catch(() => {});
 			}
 		},
 	});

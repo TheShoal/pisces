@@ -1,6 +1,6 @@
 # Custom Tools Examples
 
-Example custom tools for omp-coding-agent.
+Example custom tools for the Pisces coding-agent.
 
 ## Examples
 
@@ -23,13 +23,13 @@ Full-featured example demonstrating:
 
 ```bash
 # Test directly (can point to any .ts file)
-omp --tool examples/custom-tools/todo/index.ts
+pisces --tool examples/custom-tools/todo/index.ts
 
 # Or copy entire folder to tools directory for persistent use
-cp -r todo ~/.omp/agent/tools/
+cp -r todo ~/.pisces/agent/tools/
 ```
 
-Then in omp:
+Then in pisces:
 
 ```
 > add a todo "test custom tools"

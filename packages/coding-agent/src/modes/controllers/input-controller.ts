@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import { type AgentMessage, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { copyToClipboard, readImageFromClipboard, sanitizeText } from "@oh-my-pi/pi-natives";
 import type { AutocompleteProvider, SlashCommand } from "@oh-my-pi/pi-tui";
-import { $env } from "@oh-my-pi/pi-utils";
+import { $env, getConfigDirName } from "@oh-my-pi/pi-utils";
 import { settings } from "../../config/settings";
 import { createPromptActionAutocompleteProvider } from "../../modes/prompt-action-autocomplete";
 import { theme } from "../../modes/theme/theme";
@@ -713,7 +713,7 @@ export class InputController {
 				? [ttyHandle.fd, ttyHandle.fd, ttyHandle.fd]
 				: ["inherit", "inherit", "inherit"];
 
-			const result = await openInEditor(editorCmd, currentText, { extension: ".omp.md", stdio });
+			const result = await openInEditor(editorCmd, currentText, { extension: `${getConfigDirName()}.md`, stdio });
 			if (result !== null) {
 				this.ctx.editor.setText(result);
 			}

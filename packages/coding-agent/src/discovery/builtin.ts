@@ -4,7 +4,7 @@
  * Primary provider for OMP native configs. Supports all capabilities.
  */
 import * as path from "node:path";
-import { logger, tryParseJson } from "@oh-my-pi/pi-utils";
+import { APP_NAME, CONFIG_DIR_NAME, getConfigDirName, logger, tryParseJson } from "@oh-my-pi/pi-utils";
 import { registerProvider } from "../capability";
 import { type ContextFile, contextFileCapability } from "../capability/context-file";
 import { type Extension, type ExtensionManifest, extensionCapability } from "../capability/extension";
@@ -35,8 +35,8 @@ import {
 } from "./helpers";
 
 const PROVIDER_ID = "native";
-const DISPLAY_NAME = "OMP";
-const DESCRIPTION = "Native OMP configuration from ~/.omp and .omp/";
+const DISPLAY_NAME = APP_NAME.charAt(0).toUpperCase() + APP_NAME.slice(1);
+const DESCRIPTION = `Native ${DISPLAY_NAME} configuration from ~/${getConfigDirName()} and ${CONFIG_DIR_NAME}/`;
 const PRIORITY = 100;
 
 const PATHS = SOURCE_PATHS.native;
@@ -846,7 +846,7 @@ async function loadContextFiles(ctx: LoadContext): Promise<LoadResult<ContextFil
 registerProvider<ContextFile>(contextFileCapability.id, {
 	id: PROVIDER_ID,
 	displayName: DISPLAY_NAME,
-	description: "Load AGENTS.md from .omp/ directories",
+	description: `Load AGENTS.md from ${CONFIG_DIR_NAME}/ directories`,
 	priority: PRIORITY,
 	load: loadContextFiles,
 });

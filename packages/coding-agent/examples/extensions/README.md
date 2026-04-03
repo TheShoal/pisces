@@ -1,15 +1,15 @@
 # Extension Examples
 
-Example extensions for pi-coding-agent.
+Example extensions for the Pisces coding-agent.
 
 ## Usage
 
 ```bash
 # Load an extension with --extension flag
-pi --extension examples/extensions/permission-gate.ts
+pisces --extension examples/extensions/permission-gate.ts
 
 # Or copy to extensions directory for auto-discovery
-cp permission-gate.ts ~/.omp/agent/extensions/
+cp permission-gate.ts ~/.pisces/agent/extensions/
 ```
 
 ## Examples
