@@ -31,9 +31,10 @@ export default defineConfig({
 		siteTitle: "pisces",
 
 		nav: [
-			{ text: "Guide", link: "/session" },
-			{ text: "Configuration", link: "/config-usage" },
+			{ text: "Features", link: "/features" },
 			{ text: "SDK", link: "/sdk" },
+			{ text: "RPC", link: "/rpc" },
+			{ text: "Configuration", link: "/config-usage" },
 			{
 				text: "GitHub",
 				link: "https://github.com/usm-ricardoroche/pisces",
@@ -41,6 +42,14 @@ export default defineConfig({
 		],
 
 		sidebar: [
+			{
+				text: "Overview",
+				items: [
+					{ text: "Feature Reference", link: "/features" },
+					{ text: "SDK", link: "/sdk" },
+					{ text: "RPC Protocol", link: "/rpc" },
+				],
+			},
 			{
 				text: "Getting Started",
 				items: [
