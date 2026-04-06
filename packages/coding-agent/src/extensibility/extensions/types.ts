@@ -572,7 +572,7 @@ export interface ToolExecutionEndEvent {
 /** Fired when auto-compaction starts */
 export interface AutoCompactionStartEvent {
 	type: "auto_compaction_start";
-	reason: "threshold" | "overflow";
+	reason: "threshold" | "overflow" | "idle";
 	action: "context-full" | "handoff";
 }
 

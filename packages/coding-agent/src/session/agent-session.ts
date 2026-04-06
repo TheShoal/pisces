@@ -61,6 +61,7 @@ import {
 	extractExplicitThinkingSelector,
 	formatModelString,
 	parseModelString,
+	type ResolvedModelRoleValue,
 	resolveModelRoleValue,
 } from "../config/model-resolver";
 import { expandPromptTemplate, type PromptTemplate, renderPromptTemplate } from "../config/prompt-templates";
@@ -171,7 +172,7 @@ export type AgentSessionEvent =
 	| AgentEndEvent
 	| TurnStartEvent
 	| TurnEndEvent
-	| { type: "auto_compaction_start"; reason: "threshold" | "overflow"; action: "context-full" | "handoff" }
+	| { type: "auto_compaction_start"; reason: "threshold" | "overflow" | "idle"; action: "context-full" | "handoff" }
 	| {
 			type: "auto_compaction_end";
 			action: "context-full" | "handoff";
@@ -2186,7 +2187,11 @@ export class AgentSession {
 	}
 
 	resolveRoleModel(role: string): Model | undefined {
-		return this.#resolveRoleModel(role, this.#modelRegistry.getAvailable(), this.model);
+		return this.resolveRoleModelWithThinking(role).model;
+	}
+
+	resolveRoleModelWithThinking(role: string): ResolvedModelRoleValue {
+		return this.#resolveRoleModelFull(role, this.#modelRegistry.getAvailable(), this.model);
 	}
 
 	get promptTemplates(): ReadonlyArray<PromptTemplate> {
@@ -3271,19 +3276,21 @@ export class AgentSession {
 	 * Validates API key, saves to session log but NOT to settings.
 	 * @throws Error if no API key available for the model
 	 */
-	async setModelTemporary(model: Model): Promise<void> {
+	async setModelTemporary(model: Model, ...thinkingLevelArg: [ThinkingLevel?] | []): Promise<void> {
 		const apiKey = await this.#modelRegistry.getApiKey(model, this.sessionId);
 		if (!apiKey) {
 			throw new Error(`No API key for ${model.provider}/${model.id}`);
 		}
+
+		const thinkingLevel = thinkingLevelArg.length > 0 ? thinkingLevelArg[0] : this.thinkingLevel;
 
 		this.#clearActiveRetryFallback();
 		this.#setModelWithProviderSessionReset(model);
 		this.sessionManager.appendModelChange(`${model.provider}/${model.id}`, "temporary");
 		this.settings.getStorage()?.recordModelUsage(`${model.provider}/${model.id}`);
 
-		// Re-apply the current thinking level for the newly selected model
-		this.setThinkingLevel(this.thinkingLevel);
+		// Re-apply the selected thinking level for the newly selected model
+		this.setThinkingLevel(thinkingLevel);
 	}
 
 	/**
@@ -3355,10 +3362,14 @@ export class AgentSession {
 		const nextIndex = (currentIndex + 1) % roleModels.length;
 		const next = roleModels[nextIndex];
 
+		const nextThinkingLevel = next.explicitThinkingLevel ? next.thinkingLevel : this.thinkingLevel;
 		if (options?.temporary) {
-			await this.setModelTemporary(next.model);
+			await this.setModelTemporary(next.model, nextThinkingLevel);
 		} else {
 			await this.setModel(next.model, next.role);
+			if (next.explicitThinkingLevel && next.thinkingLevel !== undefined) {
+				this.setThinkingLevel(next.thinkingLevel);
+			}
 		}
 
 		if (next.explicitThinkingLevel && next.thinkingLevel !== undefined) {
@@ -3747,6 +3758,14 @@ export class AgentSession {
 	 */
 	abortHandoff(): void {
 		this.#handoffAbortController?.abort();
+	}
+
+	/**
+	 * Trigger idle compaction through the auto-compaction flow (with UI events).
+	 */
+	async runIdleCompaction(): Promise<void> {
+		if (this.isStreaming || this.isCompacting) return;
+		await this.#runAutoCompaction("idle", false, true);
 	}
 
 	/**
@@ -4453,19 +4472,25 @@ export class AgentSession {
 		return availableModels.find(m => m.provider === currentModel.provider && m.id === configuredTarget);
 	}
 
-	#resolveRoleModel(role: string, availableModels: Model[], currentModel: Model | undefined): Model | undefined {
+	#resolveRoleModelFull(
+		role: string,
+		availableModels: Model[],
+		currentModel: Model | undefined,
+	): ResolvedModelRoleValue {
 		const roleModelStr =
 			role === "default"
 				? (this.settings.getModelRole("default") ??
 					(currentModel ? `${currentModel.provider}/${currentModel.id}` : undefined))
 				: this.settings.getModelRole(role);
 
-		if (!roleModelStr) return undefined;
+		if (!roleModelStr) {
+			return { model: undefined, thinkingLevel: undefined, explicitThinkingLevel: false, warning: undefined };
+		}
 
 		return resolveModelRoleValue(roleModelStr, availableModels, {
 			settings: this.settings,
 			matchPreferences: { usageOrder: this.settings.getStorage()?.getModelUsageOrder() },
-		}).model;
+		});
 	}
 
 	#getCompactionModelCandidates(availableModels: Model[]): Model[] {
@@ -4482,7 +4507,7 @@ export class AgentSession {
 
 		const currentModel = this.model;
 		for (const role of MODEL_ROLE_IDS) {
-			addCandidate(this.#resolveRoleModel(role, availableModels, currentModel));
+			addCandidate(this.#resolveRoleModelFull(role, availableModels, currentModel).model);
 		}
 
 		const sortedByContext = [...availableModels].sort((a, b) => b.contextWindow - a.contextWindow);
@@ -4499,11 +4524,15 @@ export class AgentSession {
 	/**
 	 * Internal: Run auto-compaction with events.
 	 */
-	async #runAutoCompaction(reason: "overflow" | "threshold", willRetry: boolean, deferred = false): Promise<void> {
+	async #runAutoCompaction(
+		reason: "overflow" | "threshold" | "idle",
+		willRetry: boolean,
+		deferred = false,
+	): Promise<void> {
 		const compactionSettings = this.settings.getGroup("compaction");
-		if (!compactionSettings.enabled || compactionSettings.strategy === "off") return;
+		if (reason !== "idle" && (!compactionSettings.enabled || compactionSettings.strategy === "off")) return;
 		const generation = this.#promptGeneration;
-		if (!deferred && reason !== "overflow" && compactionSettings.strategy === "handoff") {
+		if (!deferred && reason !== "overflow" && reason !== "idle" && compactionSettings.strategy === "handoff") {
 			this.#schedulePostPromptTask(
 				async signal => {
 					await Promise.resolve();
@@ -4516,7 +4545,9 @@ export class AgentSession {
 		}
 
 		let action: "context-full" | "handoff" =
-			compactionSettings.strategy === "handoff" && reason !== "overflow" ? "handoff" : "context-full";
+			compactionSettings.strategy === "handoff" && reason !== "overflow" && reason !== "idle"
+				? "handoff"
+				: "context-full";
 		await this.#emitSessionEvent({ type: "auto_compaction_start", reason, action });
 		// Abort any older auto-compaction before installing this run's controller.
 		this.#autoCompactionAbortController?.abort();
@@ -4525,7 +4556,7 @@ export class AgentSession {
 		const autoCompactionSignal = autoCompactionAbortController.signal;
 
 		try {
-			if (compactionSettings.strategy === "handoff" && reason !== "overflow") {
+			if (compactionSettings.strategy === "handoff" && reason !== "overflow" && reason !== "idle") {
 				const handoffFocus = AUTO_HANDOFF_THRESHOLD_FOCUS;
 				const handoffResult = await this.handoff(handoffFocus, {
 					autoTriggered: true,
@@ -4806,7 +4837,7 @@ export class AgentSession {
 			};
 			await this.#emitSessionEvent({ type: "auto_compaction_end", action, result, aborted: false, willRetry });
 
-			if (!willRetry && compactionSettings.autoContinue !== false) {
+			if (!willRetry && reason !== "idle" && compactionSettings.autoContinue !== false) {
 				const continuePrompt = async () => {
 					await this.#promptWithMessage(
 						{
