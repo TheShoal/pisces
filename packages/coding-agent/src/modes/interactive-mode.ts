@@ -5,7 +5,14 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { type Agent, type AgentMessage, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, ImageContent, Message, Model, UsageReport } from "@oh-my-pi/pi-ai";
+import {
+	type AssistantMessage,
+	type ImageContent,
+	type Message,
+	type Model,
+	modelsAreEqual,
+	type UsageReport,
+} from "@oh-my-pi/pi-ai";
 import type { Component, SlashCommand } from "@oh-my-pi/pi-tui";
 import { Container, Loader, Markdown, ProcessTerminal, Spacer, Text, TUI, visibleWidth } from "@oh-my-pi/pi-tui";
 import { APP_NAME, getProjectDir, hsvToRgb, isEnoent, logger, postmortem } from "@oh-my-pi/pi-utils";
@@ -30,6 +37,7 @@ import type { SessionContext, SessionManager } from "../session/session-manager"
 import { getRecentSessions } from "../session/session-manager";
 import { STTController, type SttState } from "../stt";
 import type { ExitPlanModeDetails } from "../tools";
+import type { EventBus } from "../utils/event-bus";
 import { getEditorCommand, openInEditor } from "../utils/external-editor";
 import { popTerminalTitle, pushTerminalTitle, setSessionTerminalTitle } from "../utils/title-generator";
 import type { AssistantMessageComponent } from "./components/assistant-message";
@@ -52,6 +60,7 @@ import { MCPCommandController } from "./controllers/mcp-command-controller";
 import { SelectorController } from "./controllers/selector-controller";
 import { SSHCommandController } from "./controllers/ssh-command-controller";
 import { OAuthManualInputManager } from "./oauth-manual-input";
+import { SessionObserverRegistry } from "./session-observer-registry";
 import { setMermaidRenderCallback } from "./theme/mermaid-cache";
 import type { Theme } from "./theme/theme";
 import {
@@ -153,8 +162,8 @@ export class InteractiveMode implements InteractiveModeContext {
 	readonly #version: string;
 	readonly #changelogMarkdown: string | undefined;
 	#planModePreviousTools: string[] | undefined;
-	#planModePreviousModel: Model | undefined;
-	#pendingModelSwitch: Model | undefined;
+	#planModePreviousModelState: { model: Model; thinkingLevel?: ThinkingLevel } | undefined;
+	#pendingModelSwitch: { model: Model; thinkingLevel?: ThinkingLevel } | undefined;
 	#planModeHasEntered = false;
 	#planReviewContainer: Container | undefined;
 	readonly lspServers:
@@ -176,6 +185,8 @@ export class InteractiveMode implements InteractiveModeContext {
 	#voicePreviousShowHardwareCursor: boolean | null = null;
 	#voicePreviousUseTerminalCursor: boolean | null = null;
 	#resizeHandler?: () => void;
+	#observerRegistry: SessionObserverRegistry;
+	#eventBus?: EventBus;
 
 	constructor(
 		session: AgentSession,
@@ -186,6 +197,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			| Array<{ name: string; status: "ready" | "error"; fileTypes: string[]; error?: string }>
 			| undefined = undefined,
 		mcpManager?: import("../mcp").MCPManager,
+		eventBus?: EventBus,
 	) {
 		this.session = session;
 		this.sessionManager = session.sessionManager;
@@ -198,6 +210,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.lspServers = lspServers;
 		this.mcpManager = mcpManager;
 
+		this.#eventBus = eventBus;
 		this.ui = new TUI(new ProcessTerminal(), settings.get("showHardwareCursor"));
 		this.ui.setClearOnShrink(settings.get("clearOnShrink"));
 		setMermaidRenderCallback(() => this.ui.requestRender());
@@ -271,6 +284,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#commandController = new CommandController(this);
 		this.#selectorController = new SelectorController(this);
 		this.#inputController = new InputController(this);
+		this.#observerRegistry = new SessionObserverRegistry();
 	}
 
 	async init(): Promise<void> {
@@ -354,6 +368,16 @@ export class InteractiveMode implements InteractiveModeContext {
 
 		this.#inputController.setupKeyHandlers();
 		this.#inputController.setupEditorSubmitHandler();
+
+		// Wire observer registry to EventBus
+		if (this.#eventBus) {
+			this.#observerRegistry.subscribeToEventBus(this.#eventBus);
+		}
+		this.#observerRegistry.setMainSession(this.sessionManager.getSessionFile() ?? undefined);
+		this.#observerRegistry.onChange(() => {
+			this.statusLine.setSubagentCount(this.#observerRegistry.getActiveSubagentCount());
+			this.ui.requestRender();
+		});
 
 		// Load initial todos
 		await this.#loadTodoList();
@@ -616,20 +640,44 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.ui.requestRender();
 	}
 
-	async #applyPlanModeModel(): Promise<void> {
-		const planModel = this.session.resolveRoleModel("plan");
-		if (!planModel) return;
+	async #applyTemporaryModelState(state: { model: Model; thinkingLevel?: ThinkingLevel }): Promise<void> {
 		const currentModel = this.session.model;
-		if (currentModel && currentModel.provider === planModel.provider && currentModel.id === planModel.id) {
+		if (currentModel && modelsAreEqual(currentModel, state.model)) {
+			if (this.session.thinkingLevel !== state.thinkingLevel) {
+				this.session.setThinkingLevel(state.thinkingLevel);
+			}
 			return;
 		}
-		this.#planModePreviousModel = currentModel;
+		await this.session.setModelTemporary(state.model, state.thinkingLevel);
+	}
+
+	async #applyPlanModeModel(): Promise<void> {
+		const resolvedPlanModel = this.session.resolveRoleModelWithThinking("plan");
+		const planModel = resolvedPlanModel.model;
+		if (!planModel) return;
+		const nextState = {
+			model: planModel,
+			thinkingLevel: resolvedPlanModel.explicitThinkingLevel
+				? resolvedPlanModel.thinkingLevel
+				: this.session.thinkingLevel,
+		};
+		const currentModel = this.session.model;
+		if (
+			currentModel &&
+			modelsAreEqual(currentModel, nextState.model) &&
+			this.session.thinkingLevel === nextState.thinkingLevel
+		) {
+			return;
+		}
+		this.#planModePreviousModelState = currentModel
+			? { model: currentModel, thinkingLevel: this.session.thinkingLevel }
+			: undefined;
 		if (this.session.isStreaming) {
-			this.#pendingModelSwitch = planModel;
+			this.#pendingModelSwitch = nextState;
 			return;
 		}
 		try {
-			await this.session.setModelTemporary(planModel);
+			await this.#applyTemporaryModelState(nextState);
 		} catch (error) {
 			this.showWarning(
 				`Failed to switch to plan model for plan mode: ${error instanceof Error ? error.message : String(error)}`,
@@ -639,11 +687,11 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	/** Apply any deferred model switch after the current stream ends. */
 	async flushPendingModelSwitch(): Promise<void> {
-		const model = this.#pendingModelSwitch;
-		if (!model) return;
+		const state = this.#pendingModelSwitch;
+		if (!state) return;
 		this.#pendingModelSwitch = undefined;
 		try {
-			await this.session.setModelTemporary(model);
+			await this.#applyTemporaryModelState(state);
 		} catch (error) {
 			this.showWarning(
 				`Failed to switch model after streaming: ${error instanceof Error ? error.message : String(error)}`,
@@ -707,11 +755,12 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (previousTools && previousTools.length > 0) {
 			await this.session.setActiveToolsByName(previousTools);
 		}
-		if (this.#planModePreviousModel) {
+		const previousModelState = this.#planModePreviousModelState;
+		if (previousModelState) {
 			if (this.session.isStreaming) {
-				this.#pendingModelSwitch = this.#planModePreviousModel;
+				this.#pendingModelSwitch = previousModelState;
 			} else {
-				await this.session.setModelTemporary(this.#planModePreviousModel);
+				await this.#applyTemporaryModelState(previousModelState);
 			}
 		}
 
@@ -720,7 +769,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.planModePaused = options?.paused ?? false;
 		this.planModePlanFilePath = undefined;
 		this.#planModePreviousTools = undefined;
-		this.#planModePreviousModel = undefined;
+		this.#planModePreviousModelState = undefined;
 		this.#updatePlanModeStatus();
 		const paused = options?.paused ?? false;
 		this.sessionManager.appendModeChange(paused ? "plan_paused" : "none");
@@ -947,6 +996,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		this.#extensionUiController.clearExtensionTerminalInputListeners();
 		this.#extensionUiController.clearHookWidgets();
+		this.#observerRegistry.dispose();
 		this.statusLine.dispose();
 		if (this.#resizeHandler) {
 			process.stdout.removeListener("resize", this.#resizeHandler);
@@ -974,6 +1024,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 		// Emit shutdown event to hooks
 		await this.session.dispose();
+		this.#eventController.dispose();
 
 		if (this.isInitialized) {
 			this.ui.requestRender(true);
@@ -1286,6 +1337,14 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#selectorController.showDebugSelector();
 	}
 
+	showSessionObserver(): void {
+		const sessions = this.#observerRegistry.getSessions();
+		if (sessions.length <= 1) {
+			this.showStatus("No active subagent sessions");
+			return;
+		}
+		this.#selectorController.showSessionObserver(this.#observerRegistry);
+	}
 	handleBashCommand(command: string, excludeFromContext?: boolean): Promise<void> {
 		return this.#commandController.handleBashCommand(command, excludeFromContext);
 	}
