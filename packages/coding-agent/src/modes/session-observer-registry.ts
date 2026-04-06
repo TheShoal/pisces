@@ -80,6 +80,12 @@ export class SessionObserverRegistry {
 		this.#listeners.clear();
 	}
 
+	/** Clear all tracked sessions (e.g. on session switch). Keeps EventBus subscriptions and listeners. */
+	resetSessions(): void {
+		this.#sessions.clear();
+		this.#notifyListeners();
+	}
+
 	subscribeToEventBus(eventBus: EventBus): void {
 		for (const unsubscribe of this.#eventBusUnsubscribers) {
 			unsubscribe();

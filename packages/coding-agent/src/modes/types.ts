@@ -210,6 +210,7 @@ export interface InteractiveModeContext {
 	showDebugSelector(): void;
 
 	showSessionObserver(): void;
+	resetObserverRegistry(): void;
 	// Input handling
 	handleCtrlC(): void;
 	handleCtrlD(): void;

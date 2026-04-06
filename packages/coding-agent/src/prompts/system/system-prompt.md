@@ -104,6 +104,7 @@ Most tools resolve custom protocol URLs to internal resources (not web URLs):
 - `skill://<name>/<path>` — Relative file within skill directory
 - `rule://<name>` — Rule content by name
 - `memory://root` — Project memory summary (`memory_summary.md`)
+- `mcp://<resource-uri>` — MCP resource from a connected server; matched against exact resource URIs first, then RFC 6570 URI templates advertised by connected servers
 - `agent://<id>` — Full agent output artifact
 - `agent://<id>/<path>` — JSON field extraction via path (jq-like: `.foo.bar[0]`)
 - `artifact://<id>` — Raw artifact content (truncated tool output)

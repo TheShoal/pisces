@@ -982,9 +982,13 @@ export class InteractiveMode implements InteractiveModeContext {
 			return;
 		}
 		if (choice === "Refine plan") {
-			const refinement = await this.showHookInput("What should be refined?");
+			const refinement = (await this.showHookInput("What should be refined?"))?.trim();
 			if (refinement) {
-				this.editor.setText(refinement);
+				if (this.onInputCallback) {
+					this.onInputCallback(this.startPendingSubmission({ text: refinement }));
+				} else {
+					this.editor.setText(refinement);
+				}
 			}
 		}
 	}
@@ -1349,6 +1353,11 @@ export class InteractiveMode implements InteractiveModeContext {
 			return;
 		}
 		this.#selectorController.showSessionObserver(this.#observerRegistry);
+	}
+
+	resetObserverRegistry(): void {
+		this.#observerRegistry.resetSessions();
+		this.#observerRegistry.setMainSession(this.sessionManager.getSessionFile() ?? undefined);
 	}
 	handleBashCommand(command: string, excludeFromContext?: boolean): Promise<void> {
 		return this.#commandController.handleBashCommand(command, excludeFromContext);

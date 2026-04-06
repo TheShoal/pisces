@@ -3,7 +3,7 @@ import type { AssistantMessage, ToolResultMessage } from "@oh-my-pi/pi-ai";
 import { Container, Markdown, matchesKey, type SelectItem, SelectList, Spacer, Text } from "@oh-my-pi/pi-tui";
 import { formatDuration, formatNumber, logger } from "@oh-my-pi/pi-utils";
 import type { KeyId } from "../../config/keybindings";
-import type { FileEntry, SessionMessageEntry } from "../../session/session-manager";
+import type { SessionMessageEntry } from "../../session/session-manager";
 import { parseSessionEntries } from "../../session/session-manager";
 import { replaceTabs, shortenPath, truncateToWidth } from "../../tools/render-utils";
 import type { ObservableSession, SessionObserverRegistry } from "../session-observer-registry";
@@ -19,6 +19,7 @@ const MAX_TOOL_RESULT_CHARS = 300;
 export class SessionObserverOverlayComponent extends Container {
 	#registry: SessionObserverRegistry;
 	#onDone: () => void;
+	#transcriptCache?: { path: string; bytesRead: number; entries: SessionMessageEntry[] };
 	#mode: Mode = "picker";
 	#selectList: SelectList;
 	#viewerContainer: Container;
@@ -152,30 +153,53 @@ export class SessionObserverOverlayComponent extends Container {
 		this.#viewerContainer.addChild(new DynamicBorder());
 	}
 
+	#loadTranscript(sessionFile: string): SessionMessageEntry[] | null {
+		if (this.#transcriptCache?.path !== sessionFile) {
+			this.#transcriptCache = { path: sessionFile, bytesRead: 0, entries: [] };
+		}
+
+		try {
+			const result = (fs as any).readFileIncremental(sessionFile, this.#transcriptCache.bytesRead);
+			if (!result) return this.#transcriptCache.entries.length > 0 ? this.#transcriptCache.entries : null;
+
+			const { text } = result;
+			if (!text) return this.#transcriptCache.entries.length > 0 ? this.#transcriptCache.entries : null;
+
+			const lastNewlineIndex = text.lastIndexOf("\n");
+			if (lastNewlineIndex === -1)
+				return this.#transcriptCache.entries.length > 0 ? this.#transcriptCache.entries : null;
+
+			const completeText = text.slice(0, lastNewlineIndex + 1);
+			const newEntries = parseSessionEntries(completeText).filter(
+				(e): e is SessionMessageEntry => e.type === "message",
+			);
+
+			this.#transcriptCache.entries.push(...newEntries);
+			this.#transcriptCache.bytesRead += lastNewlineIndex + 1;
+
+			return this.#transcriptCache.entries;
+		} catch (error) {
+			logger.debug("Session observer failed to read session file", {
+				path: sessionFile,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return null;
+		}
+	}
+
 	#renderSessionTranscript(session: ObservableSession): void {
 		if (!session.sessionFile) {
 			this.#viewerContainer.addChild(new Text(theme.fg("dim", "No session file available yet."), 1, 0));
 			return;
 		}
 
-		let entries: FileEntry[];
-		try {
-			const text = readFileSync(session.sessionFile);
-			if (!text) {
-				this.#viewerContainer.addChild(new Text(theme.fg("dim", "Session file is empty."), 1, 0));
-				return;
-			}
-			entries = parseSessionEntries(text);
-		} catch (error) {
-			logger.debug("Session observer failed to read session file", {
-				path: session.sessionFile,
-				error: error instanceof Error ? error.message : String(error),
-			});
+		const entries = this.#loadTranscript(session.sessionFile);
+		if (!entries) {
 			this.#viewerContainer.addChild(new Text(theme.fg("dim", "Unable to read session file."), 1, 0));
 			return;
 		}
 
-		const messageEntries = entries.filter((entry): entry is SessionMessageEntry => entry.type === "message");
+		const messageEntries = entries;
 		if (messageEntries.length === 0) {
 			this.#viewerContainer.addChild(new Text(theme.fg("dim", "No messages yet."), 1, 0));
 			return;
@@ -387,13 +411,5 @@ export class SessionObserverOverlayComponent extends Container {
 		if (matchesKey(keyData, "escape")) {
 			this.#setupPicker();
 		}
-	}
-}
-
-function readFileSync(filePath: string): string {
-	try {
-		return fs.readFileSync(filePath, "utf-8");
-	} catch {
-		return "";
 	}
 }
