@@ -590,30 +590,34 @@ export class EventController {
 		if (this.ctx.editor.getText().trim()) return;
 
 		// Check token count against idle threshold
-		const messages = this.ctx.session.agent.state.messages;
-		const lastAssistant = messages
-			.slice()
-			.reverse()
-			.find((m): m is AssistantMessage => m.role === "assistant" && m.stopReason !== "aborted");
-		if (!lastAssistant?.usage) return;
-
-		const contextTokens = calculatePromptTokens(lastAssistant.usage);
 		const threshold = idleSettings.idleThresholdTokens;
-		if (threshold <= 0 || contextTokens < threshold) return;
+		if (threshold <= 0) return;
+		if (this.#currentContextTokens() < threshold) return;
 
 		const timeoutMs = Math.max(60, Math.min(3600, idleSettings.idleTimeoutSeconds)) * 1000;
 		this.#idleCompactionTimer = setTimeout(() => {
 			this.#idleCompactionTimer = undefined;
-			// Re-check conditions before firing
+			// Re-check conditions before firing. Pruning may have run between arming
+			// the timer and now, dropping usage back below the idle threshold.
 			if (this.ctx.session.isStreaming) return;
 			if (this.ctx.session.isCompacting) return;
 			if (this.ctx.editor.getText().trim()) return;
+			if (this.#currentContextTokens() < threshold) return;
 			void this.ctx.session.runIdleCompaction();
 		}, timeoutMs);
+		this.#idleCompactionTimer.unref?.();
 	}
 
 	dispose(): void {
 		this.#cancelIdleCompaction();
+	}
+
+	#currentContextTokens(): number {
+		const lastAssistant = this.ctx.session.agent.state.messages
+			.slice()
+			.reverse()
+			.find((m): m is AssistantMessage => m.role === "assistant" && m.stopReason !== "aborted");
+		return lastAssistant?.usage ? calculatePromptTokens(lastAssistant.usage) : 0;
 	}
 
 	sendCompletionNotification(): void {

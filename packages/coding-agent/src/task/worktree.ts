@@ -551,7 +551,7 @@ export async function mergeTaskBranches(
 	} finally {
 		if (didStash) {
 			try {
-				await git.stash.pop(repoRoot);
+				await git.stash.pop(repoRoot, { index: true });
 			} catch {
 				logger.warn("Failed to restore stashed changes after task merge; stash entry preserved");
 				if (!conflictResult) {
