@@ -159,8 +159,15 @@ export class SessionObserverOverlayComponent extends Container {
 		}
 
 		try {
-			const result = (fs as any).readFileIncremental(sessionFile, this.#transcriptCache.bytesRead);
+			const fromByte = this.#transcriptCache.bytesRead;
+			const result = (fs as any).readFileIncremental(sessionFile, fromByte);
 			if (!result) return this.#transcriptCache.entries.length > 0 ? this.#transcriptCache.entries : null;
+
+			// File shrank (compaction or pruning rewrote it) — invalidate and re-read from scratch
+			if (result.newSize < fromByte) {
+				this.#transcriptCache = undefined;
+				return this.#loadTranscript(sessionFile);
+			}
 
 			const { text } = result;
 			if (!text) return this.#transcriptCache.entries.length > 0 ? this.#transcriptCache.entries : null;

@@ -143,7 +143,7 @@ const serviceProviderMap: Record<string, KeyResolver> = {
 	venice: "VENICE_API_KEY",
 	vllm: "VLLM_API_KEY",
 	xiaomi: "XIAOMI_API_KEY",
-	"openai-codex": () => $pickenv("OPENAI_CODEX_OAUTH_TOKEN", "OPENAI_CODEX_API_KEY"),
+	"openai-codex": "OPENAI_CODEX_OAUTH_TOKEN",
 };
 
 /**
