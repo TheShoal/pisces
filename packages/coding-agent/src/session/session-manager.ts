@@ -1887,6 +1887,11 @@ export class SessionManager {
 		// Always drain the persist chain, even if the writer has already been
 		// closed or was never opened. An early return here leaves queued tasks
 		// unawaited and lets the Bun event loop exit before fsync completes.
+		//
+		// Await the full persistChain directly (not just the close task) so that
+		// any in-flight #writeEntriesAtomically (.tmp → .jsonl rename) completes
+		// before this method resolves. The close task is appended to the chain
+		// so it runs after all prior persistence work.
 		await this.#queuePersistTask(
 			async () => {
 				if (this.#persistWriter) {
@@ -1896,6 +1901,10 @@ export class SessionManager {
 			},
 			{ ignoreError: true },
 		);
+		// Double-check: await the chain itself to guarantee all prior tasks
+		// (including fire-and-forget _persist calls that chained via
+		// #rewriteFile → #queuePersistTask) have settled.
+		await this.#persistChain;
 		if (this.#persistError) throw this.#persistError;
 	}
 
@@ -2013,7 +2022,7 @@ export class SessionManager {
 		// creating files for sessions that never produce output. Once ensureOnDisk() has
 		// been called, the session is already on disk and every entry must be flushed.
 		if (!this.#ensuredOnDisk) {
-			const hasAssistant = this.#fileEntries.some(e => e.type === \"message\" && e.message.role === \"assistant\");
+			const hasAssistant = this.#fileEntries.some(e => e.type === "message" && e.message.role === "assistant");
 			if (!hasAssistant) {
 				// Mark as not flushed so when assistant arrives, all entries get written.
 				this.#flushed = false;

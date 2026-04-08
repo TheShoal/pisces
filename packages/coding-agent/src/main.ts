@@ -975,6 +975,10 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 			initialImages,
 		});
 		await session.dispose();
+		// Yield to the microtask queue so any pending .tmp → .jsonl rename
+		// from SessionManager.#writeEntriesAtomically can settle before
+		// postmortem.quit() calls process.exit().
+		await Bun.sleep(0);
 		stopThemeWatcher();
 		await postmortem.quit(0);
 	}
