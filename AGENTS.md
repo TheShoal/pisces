@@ -15,7 +15,7 @@ This repo contains multiple packages, but **`packages/coding-agent/`** is the pr
 | `packages/coding-agent` | Main CLI application (primary focus)                 |
 | `packages/tui`          | Terminal UI library with differential rendering      |
 | `packages/natives`      | bindings for native text/image/grep operations       |
-HY:| `packages/stats`        | Local observability dashboard (`pisces stats`)          
+| `packages/stats`        | Local observability dashboard (`pisces stats`)          
 | `packages/utils`        | Shared utilities (logger, streams, temp files)       |
 | `crates/pi-natives`     | Rust crate for performance-critical text/grep ops    |
 

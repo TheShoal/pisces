@@ -24,7 +24,7 @@
   See <a href="PLAN.md">PLAN.md</a> and <a href="ROADMAP.md">ROADMAP.md</a> for integration status and architecture.
 </p>
 
-TX:<strong>Binary:</strong> <code>pisces</code> (symlink <code>omp</code> for compatibility)<br>
+<<strongstrong>Binary:</strong> <<codecode>pisces</code> (symlink <<codecode>omp</code> for compatibility)<<brbr>
 <strong>Upstream:</strong> <a href="https://github.com/can1357/oh-my-pi">can1357/oh-my-pi</a> — <a href="docs/fork-strategy.md">Two-Track Model</a>: keep <code>@oh-my-pi/*</code> internally for merge compatibility, publish <code>@pisces/*</code> externally
 </blockquote>
 
@@ -95,6 +95,10 @@ On fatal error Pisces exits 1 and writes a JSON object to stdout: `{ code, messa
 ### Standard telemetry bridge
 
 OTLP-compatible telemetry via `OtelTelemetryAdapter`. Emits full span hierarchies in OTLP/JSON format. Configured via `pisces.telemetry` settings block.
+
+### Known Limitations & Troubleshooting
+
+**Native Binary Polyfills:** Due to Rust nightly requirements for certain core features, Pisces currently uses JS polyfills for some native operations. This ensures stability and ease of installation across different environments while the Rust toolchain is being finalized.
 
 ### Budget policy enforcement
 

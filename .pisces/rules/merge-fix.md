@@ -1,6 +1,7 @@
 ---
 description: Fix remaining TypeScript errors after upstream merge at 2b7fe3ba2
 alwaysApply: true
+Status: COMPLETE (Historical Reference Only)
 ---
 
 # Merge Type Error Fix Task

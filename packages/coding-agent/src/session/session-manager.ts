@@ -2013,7 +2013,7 @@ export class SessionManager {
 		// creating files for sessions that never produce output. Once ensureOnDisk() has
 		// been called, the session is already on disk and every entry must be flushed.
 		if (!this.#ensuredOnDisk) {
-			const hasAssistant = this.#fileEntries.some(e => e.type === "message" && e.message.role === "assistant");
+			const hasAssistant = this.#fileEntries.some(e => e.type === \"message\" && e.message.role === \"assistant\");
 			if (!hasAssistant) {
 				// Mark as not flushed so when assistant arrives, all entries get written.
 				this.#flushed = false;
@@ -2024,9 +2024,9 @@ export class SessionManager {
 		if (this.#needsFullRewriteOnNextPersist || !this.#flushed) {
 			// Full flush: rewrite the entire file atomically to avoid
 			// duplicating entries if the file already exists (e.g. from ensureOnDisk).
-			void this.#rewriteFile();
+			this.#rewriteFile();
 		} else {
-			void this.#queuePersistTask(async () => {
+			this.#queuePersistTask(async () => {
 				const writer = this.#ensurePersistWriter();
 				if (!writer) return;
 				const persistedEntry = await prepareEntryForPersistence(entry, this.#blobStore);

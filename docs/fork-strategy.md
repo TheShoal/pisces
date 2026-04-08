@@ -21,9 +21,9 @@ badlogic/pi-mono (33.2K ★, 3.7K forks)
 |------|------:|---------|------|-------|
 | `badlogic/pi-mono` | 33,177 | v0.65.2 | ~2 releases/week | Agent toolkit, CLI, TUI |
 | `can1357/oh-my-pi` | 2,759 | v14.0.1 | ~3 releases/week | Terminal-first coding agent |
-| `TheShoal/pisces` | 0 | v13.18.0 | Ad hoc | Headless/server + Shoal orchestration |
+|| `TheShoal/pisces` | 0 | v14.0.1 | Ad hoc | Headless/server + Shoal orchestration |
 
-Pisces is **151 commits behind** oh-my-pi's `main` as of 2026-04-08 (oh-my-pi ships fast — 3+ releases/week with breaking refactors in v14.x).
+Pisces is **N commits behind** oh-my-pi's `main` (check `git rev-list --count HEAD..upstream/main`) as of 2026-04-08 (oh-my-pi ships fast — 3+ releases/week with breaking refactors in v14.x).
 
 ---
 
@@ -33,13 +33,15 @@ These modules do **not exist upstream** and will never conflict:
 
 | Module | Files | Lines | Purpose |
 |--------|------:|------:|---------|
-| `shoal/` | 7 | 1,709 | Shoal multi-agent orchestration (Phases 0–5) |
-| `task/` | 15 | 7,359 | Verified isolated task execution (15 files vs upstream's 3) |
-| `session/` | 19 | 14,532 | Session inspector, replay, lifecycle management |
-| `budget/` | 3 | 257 | Wall-time budget enforcement |
-| `telemetry/` | 4 | 556 | OTLP telemetry bridge, O(1) turn-span tracking |
-| `lobster/` | 2 | 157 | lobster-party extension API |
-| **Total** | **50** | **~24,570** | **~14% of 178K-line codebase** |
+|| `shoal/` | 7 | 1,709* | Shoal multi-agent orchestration (Phases 0–5) |
+|| `task/` | 15 | 7,359* | Verified isolated task execution (15 files vs upstream's 3) |
+|| `session/` | 19 | 14,532* | Session inspector, replay, lifecycle management |
+|| `budget/` | 3 | 257* | Wall-time budget enforcement |
+|| `telemetry/` | 4 | 556* | OTLP telemetry bridge, O(1) turn-span tracking |
+|| `lobster/` | 2 | 157* | lobster-party extension API |
+|| **Total** | **50** | **~24,570*** | **~14% of 178K-line codebase** |
+
+*Line counts are approximate and should be re-verified after major merges.
 
 Upstream has a basic `task/` (3 files: agents, commands, discovery). Ours extends it with isolation backends, verification, worktree management, parallel execution, and output management. The conflict surface is the `index.ts` entry point where both add task wiring.
 

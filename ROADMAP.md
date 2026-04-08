@@ -10,28 +10,27 @@ This file tracks the longer-arc architecture work.
 Get pisces working as a drop-in replacement for opencode in lobster-loop.
 All items tracked in PLAN.md.
 
-**P0 blockers (pisces-side — all done; lobster-party items pending in that repo):**
-- Fix session writer drain in `-p` mode (done in pisces)
-- Emit `sessionFile` in `agent_end` event (done in pisces)
-- Fix `--mode=json` equals-syntax flag parsing bug; also add loud error on unrecognized mode values (done in pisces)
-- Port `messageUser` + `memorySearch` tools to pisces extension API (done in pisces)
-- Update lobster-loop `grpc.rs` output parsing for pisces event schema (lobster-party repo — pending)
-- Persist session ID→thread mapping in lobster-loop across restarts (lobster-party repo — pending)
+**P0 blockers (pisces-side — DONE):**
+- Fix session writer drain in `-p` mode
+- Emit `sessionFile` in `agent_end` event
+- Fix `--mode=json` equals-syntax flag parsing bug; also add loud error on unrecognized mode values
+- Port `messageUser` + `memorySearch` tools to pisces extension API
+
+**External dependencies (lobster-party repo — pending):**
+- Update lobster-loop `grpc.rs` output parsing for pisces event schema
+- Persist session ID→thread mapping in lobster-loop across restarts
 
 **P1 quality-of-life — DONE:**
-- `--no-provider-discovery` flag (already implemented)
-- `--agent <name>` flag (already implemented)
+- `--no-provider-discovery` flag
+- `--agent <<namename>` flag
 - Structured error JSON on exit code 1: `fatalError()` helper + top-level catch in `launch.ts`; error codes: `INVALID_ARG`, `NO_MODEL`, `STARTUP_ERROR`, `TURN_FAILED`
-- `--session-dir` validated end-to-end (fully wired via `cfff626ba`; PLAN.md test was stale)
+- `--session-dir` validated end-to-end (fully wired)
 
 **Shoal integration:** Shoal-P0 (tool profile) and Shoal-P1 (`PISCES_MCP_SOCKETS` injection) are complete.
-Shoal-P2 (templates, robo profile, config interpolation) and Shoal-P3 (gRPC session backend) are nice-to-have, not started.
 
-## Embedder-grade platform hardening (next major arc)
+## Embedder-grade platform hardening
 
-> Start with Epic 1 and Epic 2. Epic 3 is designed alongside Epic 2 because budget enforcement depends on the same usage and telemetry plumbing.
-
-> Design doc: [docs/verified-task-execution-observability.md](docs/verified-task-execution-observability.md)
+Design doc: [docs/verified-task-execution-observability.md](docs/verified-task-execution-observability.md)
 
 ### Epic 1. Verified isolated task execution (P0) — DONE
 
@@ -61,7 +60,7 @@ Shoal-P2 (templates, robo profile, config interpolation) and Shoal-P3 (gRPC sess
 - Eight new settings under `task.budget.*`; controller is only instantiated when at least one limit is configured.
 - `docs/rpc.md` updated with `BudgetSnapshot` field table, event shapes, and settings reference.
 
-### Epic 4. Hybrid repo retrieval (P1) — PARTIALLY DONE
+### Epic 4. Hybrid repo retrieval (P1) — IN PROGRESS
 
 - Build a retrieval pipeline that combines `grep`, `ast_grep`, `lsp`, and optional semantic reranking.
 - Keep deterministic candidate generation as the default; semantic ranking reranks candidates instead of replacing structural search.
@@ -69,7 +68,7 @@ Shoal-P2 (templates, robo profile, config interpolation) and Shoal-P3 (gRPC sess
 - `hybrid_search` tool ships: unified `grep` + `ast_grep` + `lsp` retrieval with provenance scoring.
 - Semantic reranking pending (optional layer on top of deterministic candidate generation).
 
-### Epic 5. Session replay inspector (P1) — PARTIALLY DONE
+### Epic 5. Session replay inspector (P1) — IN PROGRESS
 
 - Expose session tree movement, branch summaries, tool timelines, TTSR injections, retries, and compactions as replayable structured data.
 - Ship the headless inspection layer first; UI visualizers remain a thin consumer on top of the same replay model.

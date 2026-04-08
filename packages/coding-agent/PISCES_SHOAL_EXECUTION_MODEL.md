@@ -42,9 +42,7 @@ Use `/team` (Shoal-backed) when:
 - the run is long-lived enough to warrant session identity
 
 `/team` requires `shoal-mcp-server` on PATH and `shoal.enabled: true`
-(the default). If Shoal is not installed, the command fails with a clear
-error at connect time — it does not silently fall back to `task`.
-
+(the default). The session must have MCP servers configured (specifically the `shoal-orchestrator` MCP). If Shoal is not installed or configured, the command fails with a clear
 ## Decision rule
 
 > If the work fits inside one agent session, use `task`.

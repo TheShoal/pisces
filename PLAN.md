@@ -39,10 +39,14 @@ headless behavior and defines the changes needed for a clean lobster-party integ
 - 40+ new AI models (Gemini 2.5 Pro/Flash, Claude Sonnet 4.5, GPT-4.1, o3-mini, etc.)
 - `.pisces/` config dir; falls back to `.claude/`, `.codex/`, `.gemini/`
 
-### Partially done
+### In Progress
 
 - Epic 4 (Hybrid repo retrieval): `hybrid_search` tool ships; semantic reranking pending
-- Epic 5 (Session replay inspector): headless `pisces session inspect <file>` CLI ships; UI visualizers pending
+- Epic 5 (Session replay inspector): headless `pisces session inspect <<filefile>` CLI ships; UI visualizers pending
+
+### Upstream Merge Fix (Completed)
+
+Resolved 40+ TypeScript errors after upstream merge fix. Implemented native binary polyfills for critical operations to bypass Rust nightly build requirements.
 
 ### Pending / future
 
