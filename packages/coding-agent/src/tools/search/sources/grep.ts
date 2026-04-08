@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import type { SearchDb } from "@oh-my-pi/pi-natives";
-import { type GrepMatch, grep } from "@oh-my-pi/pi-natives";
+import { type GrepMatch, GrepOutputMode, grep } from "@oh-my-pi/pi-natives";
 import {
 	combineSearchGlobs,
 	normalizePathLikeInput,
@@ -71,7 +71,7 @@ export class GrepSource implements RetrievalSource {
 					contextBefore: context,
 					contextAfter: context,
 					maxColumns: 200,
-					mode: "content",
+					mode: GrepOutputMode.Content,
 				},
 				undefined,
 				this.searchDb,

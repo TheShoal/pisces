@@ -17,10 +17,10 @@ import * as os from "node:os";
 import path from "node:path";
 import type { AgentTool, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
 import type { Usage } from "@oh-my-pi/pi-ai";
-import { $env, Snowflake } from "@oh-my-pi/pi-utils";
+import { $env, prompt, Snowflake } from "@oh-my-pi/pi-utils";
 import type { ToolSession } from "..";
 import { resolveAgentModelPatterns } from "../config/model-resolver";
-import { renderPromptTemplate } from "../config/prompt-templates";
+
 import type { Theme } from "../modes/theme/theme";
 import planModeSubagentPrompt from "../prompts/system/plan-mode-subagent.md" with { type: "text" };
 import taskVerificationRepairTemplate from "../prompts/task/task-verification-repair.md" with { type: "text" };
@@ -297,6 +297,7 @@ async function runVerificationAttempt(
 	let failed = false;
 	options.onEvent?.({
 		type: "subagent_verification_start",
+		taskId: options.taskId,
 		id: options.taskId,
 		attempt: options.attemptNumber,
 		profile: verification.profile,
@@ -306,6 +307,8 @@ async function runVerificationAttempt(
 		const cmdStart = Date.now();
 		options.onEvent?.({
 			type: "subagent_verification_command_start",
+			taskId: options.taskId,
+			command: command.command,
 			id: options.taskId,
 			attempt: options.attemptNumber,
 			commandName: command.name,
@@ -358,10 +361,11 @@ async function runVerificationAttempt(
 		});
 		options.onEvent?.({
 			type: "subagent_verification_command_end",
+			taskId: options.taskId,
+			exitCode: cmdExitCode,
 			id: options.taskId,
 			attempt: options.attemptNumber,
 			commandName: command.name,
-			exitCode: cmdExitCode,
 			durationMs: cmdDurationMs,
 			artifactId: cmdArtifactId,
 		});
@@ -370,8 +374,7 @@ async function runVerificationAttempt(
 		}
 	}
 	const status = (failed ? "failed" : "passed") as "failed" | "passed";
-	options.onEvent?.({ type: "subagent_verification_end", id: options.taskId, attempt: options.attemptNumber, status });
-	return {
+	const result: VerificationAttemptResult = {
 		attempt: options.attemptNumber,
 		status,
 		startedAt,
@@ -379,6 +382,8 @@ async function runVerificationAttempt(
 		commandResults,
 		error: failed ? "One or more verification commands failed." : undefined,
 	};
+	options.onEvent?.({ type: "subagent_verification_end", taskId: options.taskId, result, id: options.taskId, attempt: options.attemptNumber, status });
+	return result;
 }
 
 function buildRepairPrompt(task: string, attempt: VerificationAttemptResult, contextLineLimit: number): string {
@@ -392,7 +397,7 @@ function buildRepairPrompt(task: string, attempt: VerificationAttemptResult, con
 				: "(no output captured)",
 		}));
 	const failureSummary = failedCommands.map(c => `- \`${c.name}\`: exited non-zero`).join("\n");
-	return renderPromptTemplate(taskVerificationRepairTemplate, {
+	return prompt.render(taskVerificationRepairTemplate, {
 		task,
 		failureSummary,
 		failedCommands,
@@ -431,7 +436,7 @@ function renderDescription(
 	disabledAgents: string[],
 ): string {
 	const filteredAgents = disabledAgents.length > 0 ? agents.filter(a => !disabledAgents.includes(a.name)) : agents;
-	return renderPromptTemplate(taskDescriptionTemplate, {
+	return prompt.render(taskDescriptionTemplate, {
 		agents: filteredAgents,
 		MAX_CONCURRENCY: maxConcurrency,
 		isolationEnabled,
@@ -1072,6 +1077,8 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 					const snapshot = this.session.budgetController.getSnapshot();
 					this.session.emitEvent?.({
 						type: "budget_exceeded",
+						budget: 0,
+						spent: 0,
 						scope: "task",
 						snapshot,
 					});
@@ -1133,6 +1140,7 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 					this.session.emitEvent?.({
 						type: "subagent_end",
 						id: task.id,
+						success: nonIsolatedResult.exitCode === 0,
 						agent: agent.name,
 						exitCode: nonIsolatedResult.exitCode,
 					});
@@ -1239,11 +1247,13 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 									// Check budget before spawning the repair subagent
 									if (this.session.budgetController?.isExceeded()) {
 										const snapshot = this.session.budgetController.getSnapshot();
-										this.session.emitEvent?.({
-											type: "budget_exceeded",
-											scope: "task",
-											snapshot,
-										});
+								this.session.emitEvent?.({
+									type: "budget_exceeded",
+									budget: 0,
+									spent: 0,
+									scope: "task",
+									snapshot,
+								});
 										// Abort repair — budget exceeded; return failed result from attempt1
 										const budgetErr = `Budget exceeded (${snapshot.reason ?? "limit"}); repair skipped`;
 										return {
@@ -1491,6 +1501,7 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 				this.session.emitEvent?.({
 					type: "subagent_end",
 					id: task.id,
+					success: isolatedResult.exitCode === 0,
 					agent: agent.name,
 					exitCode: isolatedResult.exitCode,
 					verification: isolatedResult.verification,
@@ -1725,7 +1736,7 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 
 			const outputIds = results.filter(r => !r.aborted || r.output.trim()).map(r => `agent://${r.id}`);
 			const backendSummaryPrefix = isolationBackendWarning ? `\n\n${isolationBackendWarning}` : "";
-			const summary = renderPromptTemplate(taskSummaryTemplate, {
+			const summary = prompt.render(taskSummaryTemplate, {
 				successCount,
 				totalCount: results.length,
 				cancelledCount,

@@ -221,6 +221,9 @@ export interface CreateAgentSessionOptions {
 
 	/** Whether UI is available (enables interactive tools like ask). Default: false */
 	hasUI?: boolean;
+
+	/** Additional MCP servers to register (e.g., from PISCES_MCP_SOCKETS). Merged with discovered servers. */
+	extraMcpServers?: Record<string, import("./mcp/types").MCPStdioServerConfig | { type: string; command?: string; args?: string[]; url?: string }>;
 }
 
 /** Result from createAgentSession */

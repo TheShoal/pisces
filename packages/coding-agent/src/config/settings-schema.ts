@@ -1703,6 +1703,32 @@ export const SETTINGS_SCHEMA = {
 	"thinkingBudgets.high": { type: "number", default: 16384 },
 
 	"thinkingBudgets.xhigh": { type: "number", default: 32768 },
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Pisces-specific settings
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	"pisces.lobsterMode": { type: "boolean", default: false },
+	"pisces.noProviderDiscovery": { type: "boolean", default: false },
+	"pisces.mcpSockets": { type: "array", default: [] as string[] },
+	"pisces.preset": { type: "string", default: undefined },
+
+	// Shoal orchestration
+	"shoal.enabled": { type: "boolean", default: true },
+
+	// Autoresearch
+	"autoresearch.enabled": { type: "boolean", default: false },
+
+	// Task verification
+	"task.verification.enabled": { type: "boolean", default: false },
+	"task.verification.requireForIsolated": { type: "boolean", default: true },
+	"task.verification.defaultProfile": { type: "string", default: "default" },
+	"task.verification.maxRetries": { type: "number", default: 1 },
+	"task.verification.profiles": { type: "record", default: {} as Record<string, unknown> },
+	"task.verification.failureContextLineLimit": { type: "number", default: 50 },
+
+	// SSH
+	"ssh.enabled": { type: "boolean", default: true },
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1907,6 +1933,42 @@ export interface BashInterceptorRule {
 	allowSubcommands?: string[];
 }
 
+
+/** Pisces-specific settings */
+export interface PiscesSettings {
+	/** Disable provider discovery at startup */
+	noProviderDiscovery?: boolean;
+	/** Enable lobster-party mode (debugging) */
+	lobsterMode?: boolean;
+	/** MCP server socket paths */
+	mcpSockets?: string;
+}
+
+export interface ShoalSettings {
+	/** Enable Shoal orchestration mode */
+	enabled?: boolean;
+}
+
+export interface TaskVerificationSettings {
+	/** Enable task verification */
+	enabled?: boolean;
+	/** Require verification for isolated tasks */
+	requireForIsolated?: boolean;
+	/** Default verification profile */
+	defaultProfile?: string;
+	/** Max verification retries */
+	maxRetries?: number;
+	/** Verification profiles */
+	profiles?: string;
+	/** Failure context line limit */
+	failureContextLineLimit?: number;
+}
+
+export interface AutoresearchSettings {
+	/** Enable auto-research */
+	enabled?: boolean;
+}
+
 /** Map group prefix -> typed settings interface */
 export interface GroupTypeMap {
 	compaction: CompactionSettings;
@@ -1924,6 +1986,10 @@ export interface GroupTypeMap {
 	modelRoles: Record<string, string>;
 	modelTags: ModelTagsSettings;
 	cycleOrder: string[];
+	pisces: PiscesSettings;
+	shoal: ShoalSettings;
+	taskVerification: TaskVerificationSettings;
+	autoresearch: AutoresearchSettings;
 }
 
 export type GroupPrefix = keyof GroupTypeMap;

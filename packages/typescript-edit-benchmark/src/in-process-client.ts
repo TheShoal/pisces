@@ -114,7 +114,7 @@ export class InProcessClient {
 			// Only forward AgentEvent types (not session-specific ones)
 			if (isAgentEvent(event)) {
 				for (const listener of this.#eventListeners) {
-					listener(event);
+					listener(event as AgentEvent);
 				}
 			}
 		});
@@ -213,6 +213,6 @@ const AGENT_EVENT_TYPES = new Set([
 	"tool_execution_end",
 ]);
 
-function isAgentEvent(event: AgentSessionEvent): event is AgentEvent {
-	return AGENT_EVENT_TYPES.has(event.type);
+function isAgentEvent(event: AgentSessionEvent): boolean {
+	return AGENT_EVENT_TYPES.has(event.type) && event.type !== "agent_end";
 }

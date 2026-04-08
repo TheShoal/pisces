@@ -239,15 +239,15 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 			// Subagent lifecycle
 			case "subagent_start":
 				this.#startSpan(`subagent:${event.id}`, "pisces.subagent_run", "session", {
-					[Attr.SUBAGENT_ID]: event.id,
-					[Attr.AGENT_NAME]: event.agent,
-					[Attr.SUBAGENT_ISOLATED]: event.isolated,
+					...(event.id ? { [Attr.SUBAGENT_ID]: event.id } : {}),
+					...(event.agent ? { [Attr.AGENT_NAME]: event.agent } : {}),
+					...(event.isolated !== undefined ? { [Attr.SUBAGENT_ISOLATED]: event.isolated } : {}),
 				});
 				break;
 
 			case "subagent_end":
 				this.#closeSpan(`subagent:${event.id}`, event.exitCode === 0 ? "ok" : "error", {
-					[Attr.SUBAGENT_EXIT_CODE]: event.exitCode,
+					...(event.exitCode !== undefined ? { [Attr.SUBAGENT_EXIT_CODE]: event.exitCode } : {}),
 					...(event.verification?.status ? { [Attr.VERIFICATION_STATUS]: event.verification.status } : {}),
 				});
 				break;
@@ -259,8 +259,8 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 					"pisces.subagent_verification",
 					`subagent:${event.id}`,
 					{
-						[Attr.SUBAGENT_ID]: event.id,
-						[Attr.VERIFICATION_ATTEMPT]: event.attempt,
+						...(event.id ? { [Attr.SUBAGENT_ID]: event.id } : {}),
+						...(event.attempt !== undefined ? { [Attr.VERIFICATION_ATTEMPT]: event.attempt } : {}),
 						...(event.profile ? { [Attr.VERIFICATION_PROFILE]: event.profile } : {}),
 					},
 				);
@@ -268,7 +268,7 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 
 			case "subagent_verification_end":
 				this.#closeSpan(`verification:${event.id}:${event.attempt}`, event.status === "passed" ? "ok" : "error", {
-					[Attr.VERIFICATION_STATUS]: event.status,
+					...(event.status ? { [Attr.VERIFICATION_STATUS]: event.status } : {}),
 				});
 				break;
 
@@ -278,9 +278,9 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 					"pisces.subagent_verification.command",
 					`verification:${event.id}:${event.attempt}`,
 					{
-						[Attr.SUBAGENT_ID]: event.id,
-						[Attr.VERIFICATION_ATTEMPT]: event.attempt,
-						[Attr.VERIFICATION_COMMAND]: event.commandName,
+						...(event.id ? { [Attr.SUBAGENT_ID]: event.id } : {}),
+						...(event.attempt !== undefined ? { [Attr.VERIFICATION_ATTEMPT]: event.attempt } : {}),
+						...(event.commandName ? { [Attr.VERIFICATION_COMMAND]: event.commandName } : {}),
 					},
 				);
 				break;
@@ -290,8 +290,8 @@ export class OtelTelemetryAdapter implements RuntimeTelemetryAdapter {
 					`vcmd:${event.id}:${event.attempt}:${event.commandName}`,
 					event.exitCode === 0 ? "ok" : "error",
 					{
-						[Attr.VERIFICATION_COMMAND_EXIT_CODE]: event.exitCode,
-						[Attr.VERIFICATION_COMMAND_DURATION_MS]: event.durationMs,
+						...(event.exitCode !== undefined ? { [Attr.VERIFICATION_COMMAND_EXIT_CODE]: event.exitCode } : {}),
+						...(event.durationMs !== undefined ? { [Attr.VERIFICATION_COMMAND_DURATION_MS]: event.durationMs } : {}),
 						...(event.artifactId ? { [Attr.VERIFICATION_ARTIFACT_ID]: event.artifactId } : {}),
 					},
 				);

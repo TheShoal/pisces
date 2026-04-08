@@ -71,6 +71,7 @@ import type { LoadedCustomCommand } from "../extensibility/custom-commands";
 import type { CustomTool, CustomToolContext } from "../extensibility/custom-tools/types";
 import { CustomToolAdapter } from "../extensibility/custom-tools/wrapper";
 import type {
+	AgentEndEvent,
 	ExtensionCommandContext,
 	ExtensionRunner,
 	ExtensionUIContext,
@@ -163,7 +164,25 @@ import { getAdapter } from "../telemetry";
 
 /** Session-specific events that extend the core AgentEvent */
 export type AgentSessionEvent =
-	| AgentEvent
+	// Core agent events, with richer session-level shapes overriding the bare AgentEvent variants
+	| Exclude<AgentEvent, { type: "agent_end" | "turn_start" | "turn_end" }>
+	| AgentEndEvent
+	| TurnStartEvent
+	| TurnEndEvent
+	// Pisces-specific events
+	| { type: "budget_check"; budget: number; spent: number; remaining: number }
+	| { type: "budget_exceeded"; budget?: number; spent?: number; scope?: string; snapshot?: unknown }
+	| { type: "budget_warning"; budget?: number; spent?: number; scope?: string; snapshot?: unknown }
+	| { type: "telemetry_event"; event: string; properties?: Record<string, unknown> }
+	| { type: "subagent_start"; id: string; taskId?: string; agent?: string; isolated?: boolean }
+	| { type: "subagent_end"; id: string; success: boolean; taskId?: string; agent?: string; exitCode?: number; verification?: { status?: string } }
+	| { type: "subagent_spawned"; sessionId: string; taskId?: string }
+	| { type: "subagent_completed"; sessionId: string; success: boolean }
+	| { type: "subagent_verification_start"; taskId: string; id?: string; attempt?: number; profile?: string }
+	| { type: "subagent_verification_command_start"; taskId: string; command: string; id?: string; attempt?: number; commandName?: string }
+	| { type: "subagent_verification_command_end"; taskId: string; exitCode: number; id?: string; attempt?: number; commandName?: string; durationMs?: number; artifactId?: string }
+	| { type: "subagent_verification_end"; taskId: string; result: VerificationAttemptResult; id?: string; attempt?: number; status?: string }
+	// Upstream session events
 	| { type: "auto_compaction_start"; reason: "threshold" | "overflow" | "idle"; action: "context-full" | "handoff" }
 	| {
 			type: "auto_compaction_end";
@@ -182,11 +201,7 @@ export type AgentSessionEvent =
 	| { type: "ttsr_triggered"; rules: Rule[] }
 	| { type: "todo_reminder"; todos: TodoItem[]; attempt: number; maxAttempts: number }
 	| { type: "todo_auto_clear" }
-	| { type: "budget_check"; budget: number; spent: number; remaining: number }
-	| { type: "budget_exceeded"; budget: number; spent: number }
-	| { type: "telemetry_event"; event: string; properties?: Record<string, unknown> }
-	| { type: "subagent_spawned"; sessionId: string; taskId?: string }
-	| { type: "subagent_completed"; sessionId: string; success: boolean };
+;
 
 /** Listener function for agent session events */
 export type AgentSessionEventListener = (event: AgentSessionEvent) => void;
@@ -723,7 +738,7 @@ export class AgentSession {
 		// values. The original event.message stays obfuscated so the persistence path below
 		// writes `#HASH#` tokens to the session file; convertToLlm re-obfuscates outbound
 		// traffic on the next turn. Walks text, thinking, and toolCall arguments/intent.
-		let displayEvent: AgentEvent = event;
+		let displayEvent: AgentSessionEvent = event as AgentSessionEvent;
 		const obfuscator = this.#obfuscator;
 		if (obfuscator && event.type === "message_end" && event.message.role === "assistant") {
 			const message = event.message;
@@ -1626,7 +1641,12 @@ export class AgentSession {
 			this.#nextToolChoiceOverride = undefined;
 			await this.#extensionRunner.emit({ type: "agent_start" });
 		} else if (event.type === "agent_end") {
-			await this.#extensionRunner.emit({ type: "agent_end", messages: event.messages });
+			await this.#extensionRunner.emit({
+				type: "agent_end",
+				messages: event.messages,
+				sessionId: this.sessionManager.sessionId,
+				sessionFile: this.sessionManager.sessionFile,
+			});
 		} else if (event.type === "turn_start") {
 			const hookEvent: TurnStartEvent = {
 				type: "turn_start",

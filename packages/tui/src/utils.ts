@@ -1,6 +1,17 @@
 import { getDefaultTabWidth, getIndentation, sliceWithWidth } from "@oh-my-pi/pi-natives";
 
-export { Ellipsis, extractSegments, sliceWithWidth, truncateToWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-natives";
+// Ellipsis enum — declared in pi-natives .d.ts but not exported by the compiled .node binary.
+// Re-define here as a runtime-safe fallback.
+export enum Ellipsis {
+	/** Use a single Unicode ellipsis character ("…"). */
+	Unicode = 0,
+	/** Use three ASCII dots ("..."). */
+	Ascii = 1,
+	/** Omit ellipsis entirely. */
+	Omit = 2,
+}
+
+export { extractSegments, sliceWithWidth, truncateToWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-natives";
 
 // Pre-allocated space buffer for padding
 const SPACE_BUFFER = " ".repeat(512);

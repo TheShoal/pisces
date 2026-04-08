@@ -70,7 +70,7 @@ describe("EventController idle compaction teardown", () => {
 		} as unknown as InteractiveModeContext;
 
 		const controller = new EventController(context);
-		await controller.handleEvent({ type: "agent_end", messages: [createAssistantMessage()] });
+		await controller.handleEvent({ type: "agent_end", sessionId: "test", sessionFile: "/test.jsonl", messages: [createAssistantMessage()] });
 		controller.dispose();
 		vi.advanceTimersByTime(60_000);
 

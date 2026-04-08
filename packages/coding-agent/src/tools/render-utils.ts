@@ -6,15 +6,13 @@
  */
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Ellipsis } from "@oh-my-pi/pi-natives";
-import { replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
+import { Ellipsis, replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
 import { pluralize } from "@oh-my-pi/pi-utils";
 import { settings } from "../config/settings";
 import type { Theme } from "../modes/theme/theme";
 import { formatDimensionNote, type ResizedImage } from "../utils/image-resize";
 
-export { Ellipsis } from "@oh-my-pi/pi-natives";
-export { replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
+export { Ellipsis, replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
 
 // =============================================================================
 // Standardized Display Constants

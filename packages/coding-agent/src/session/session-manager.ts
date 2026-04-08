@@ -1426,6 +1426,16 @@ export class SessionManager {
 	#inMemoryArtifactCounter = 0;
 	readonly #blobStore: BlobStore;
 
+	/** The 16-character hex session ID */
+	get sessionId(): string {
+		return this.#sessionId;
+	}
+
+	/** Resolved path to the session file (may be undefined if session has no file) */
+	get sessionFile(): string | undefined {
+		return this.#sessionFile;
+	}
+
 	private constructor(
 		private cwd: string,
 		private sessionDir: string,

@@ -182,13 +182,40 @@ export class BudgetController {
 				clearInterval(this.#wallTimeTimer);
 				this.#wallTimeTimer = undefined;
 			}
-			this.#emit({ type: "budget_exceeded", scope: this.#scope, snapshot });
+			this.#emit({ type: "budget_exceeded", budget: this.#budgetFor(snapshot.reason), spent: this.#spentFor(snapshot.reason), scope: this.#scope, snapshot });
 			return;
 		}
 
 		if (snapshot.status === "warning" && snapshot.reason && !this.#warnedDimensions.has(snapshot.reason)) {
 			this.#warnedDimensions.add(snapshot.reason);
-			this.#emit({ type: "budget_warning", scope: this.#scope, snapshot });
+			this.#emit({ type: "budget_warning", budget: this.#budgetFor(snapshot.reason), spent: this.#spentFor(snapshot.reason), scope: this.#scope, snapshot });
+		}
+	}
+
+	#budgetFor(reason: BudgetViolationReason | undefined): number {
+		const p = this.#policy;
+		switch (reason) {
+			case "wall_time": return p.maxWallTimeMs ?? 0;
+			case "input_tokens": return p.maxInputTokens ?? 0;
+			case "output_tokens": return p.maxOutputTokens ?? 0;
+			case "total_tokens": return p.maxTotalTokens ?? 0;
+			case "cost": return p.maxCostUsd ?? 0;
+			case "tool_calls": return p.maxToolCalls ?? 0;
+			case "subagents": return p.maxSubagents ?? 0;
+			default: return 0;
+		}
+	}
+
+	#spentFor(reason: BudgetViolationReason | undefined): number {
+		switch (reason) {
+			case "wall_time": return this.#startTimeMs ? Date.now() - this.#startTimeMs : 0;
+			case "input_tokens": return this.#inputTokens;
+			case "output_tokens": return this.#outputTokens;
+			case "total_tokens": return this.#totalTokens;
+			case "cost": return this.#costUsd;
+			case "tool_calls": return this.#toolCalls;
+			case "subagents": return this.#subagents;
+			default: return 0;
 		}
 	}
 }

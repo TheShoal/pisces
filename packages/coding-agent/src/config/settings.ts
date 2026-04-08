@@ -62,6 +62,11 @@ export interface SettingsOptions {
 // Path Utilities
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Split a dot-separated setting key into path segments. */
+function parsePath(key: string): string[] {
+	return key.split(".");
+}
+
 /**
  * Get a nested value from an object by path segments.
  */

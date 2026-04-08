@@ -59,8 +59,8 @@ const agentEventTypes = new Set<AgentEvent["type"]>([
 	"tool_execution_end",
 ]);
 
-const isAgentEvent = (event: AgentSessionEvent): event is AgentEvent =>
-	agentEventTypes.has(event.type as AgentEvent["type"]);
+const isAgentEvent = (event: AgentSessionEvent): boolean =>
+	agentEventTypes.has(event.type as AgentEvent["type"]) && event.type !== "agent_end";
 
 function normalizeModelPatterns(value: string | string[] | undefined): string[] {
 	if (!value) return [];
@@ -1087,7 +1087,7 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 			unsubscribe = session.subscribe(event => {
 				if (isAgentEvent(event)) {
 					try {
-						processEvent(event);
+						processEvent(event as AgentEvent);
 					} catch (err) {
 						logger.error("Subagent event processing failed", {
 							error: err instanceof Error ? err.message : String(err),
