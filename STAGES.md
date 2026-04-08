@@ -1,5 +1,7 @@
 # ChunkState Migration — Parallelization Stages
 
+> **NOTE:** This migration is currently blocked pending Rust nightly setup. The current implementation uses JS polyfills (see `packages/natives/native/index.js`) to maintain functionality.
+
 ## Stage 0: Types (sequential, ~5 min)
 **Owner:** main agent
 
