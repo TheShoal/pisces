@@ -566,26 +566,58 @@ binaries (including native addon `.node` files for each platform) via JFrog
 Artifactory. Build pipeline details TBD — instructions to be provided when the
 decision is made.
 
-No npm publishing planned.
+~= npm publishing: `@pisces/coding-agent` as re-export shim (see [fork-strategy.md](docs/fork-strategy.md) Phase 2) =~
 
 ---
 
 ## Upstream sync policy
 
-Track `can1357/oh-my-pi` as upstream remote:
+> **Full strategy doc**: [docs/fork-strategy.md](docs/fork-strategy.md) — Two-Track Model, ecosystem research, migration path.
+
+### Two-Track Model
+
+We keep internal `@oh-my-pi/*` package names to preserve upstream merge compatibility, while publishing externally as `@pisces/*` via a re-export shim. This gives us both the terminal UX from upstream *and* our server/headless additions.
+
+**Track 1 — `pisces` (product layer):** Binary `pisces`, config `~/.pisces/`, NPM `@pisces/coding-agent`, Shoal/budget/telemetry/lobster features.
+
+**Track 2 — `@oh-my-pi/*` (core layer):** Internal packages stay on upstream namespace. Agent loop, TUI, tools, MCP stack flow from upstream as-is. This is what makes merges work.
+
+### Upstream remote (configured)
 
 ```bash
-git remote add upstream https://github.com/can1357/oh-my-pi.git
+git remote add upstream https://github.com/can1357/oh-my-pi.git  # already done
 git fetch upstream
-git merge upstream/main  # after review
 ```
 
-Pisces changes are scoped to minimize conflict surface:
-- `src/lobster/` — new directory, never conflicts
+### Sync procedure (biweekly)
+
+```bash
+git fetch upstream
+git checkout -b sync/upstream-$(date +%Y%m%d)
+git merge upstream/main --no-ff
+# Resolve conflicts (see docs/fork-strategy.md §Conflict Surface)
+# bun.lock: delete + `bun install`
+# task/index.ts: careful manual merge (convergent evolution with upstream)
+# Others: typically additive
+bun run check:ts && bun run check:rs && bun test
+git push origin sync/upstream-$(date +%Y%m%d)
+```
+
+### Conflict surface (tested 2026-04-08, v14.0.1)
+
+9 conflicts in 763 changed files. Most are additive (Pisces adds imports/initialization alongside upstream changes). The only hard conflict is `task/index.ts` — both projects evolved the task module independently. See [fork-strategy.md](docs/fork-strategy.md) for the full conflict table.
+
+### Pisces-scoped changes (never conflict with upstream)
+
+- `src/lobster/` — new directory, no upstream equivalent
+- `src/shoal/` — new directory, no upstream equivalent
+- `src/budget/` — new directory, no upstream equivalent
+- `src/telemetry/` — new directory, no upstream equivalent
 - `src/modes/print-mode.ts` — targeted patches to session drain + event emission
 - `src/cli/args.ts` — additive flags only
 - `crates/pi-natives/src/session_storage.rs` — new file, no upstream equivalent
 - `crates/pi-grpc/` — new crate, no upstream equivalent
 
-The TypeScript agent loop, TUI, tool implementations, MCP stack, and bundled
-agents are **left alone** — updated from upstream as-is.
+### When to consider full `@pisces/*` rename
+
+When the merge tax consistently exceeds the value of upstream updates. This is **not urgent** — the Two-Track model defers this indefinitely. See [fork-strategy.md](docs/fork-strategy.md) §Phase 3.

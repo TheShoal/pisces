@@ -24,9 +24,8 @@
   See <a href="PLAN.md">PLAN.md</a> and <a href="ROADMAP.md">ROADMAP.md</a> for integration status and architecture.
 </p>
 
-<blockquote>
-<strong>Binary:</strong> <code>pisces</code> (symlink <code>omp</code> for compatibility)<br>
-<strong>Upstream:</strong> <a href="https://github.com/can1357/oh-my-pi">can1357/oh-my-pi</a> — sync periodically; changes scoped to <code>src/lobster/</code>, <code>src/shoal/</code>, <code>src/cli/args.ts</code>, <code>src/modes/print-mode.ts</code>, and Epic modules (telemetry, budget enforcement, verified task execution).
+TX:<strong>Binary:</strong> <code>pisces</code> (symlink <code>omp</code> for compatibility)<br>
+<strong>Upstream:</strong> <a href="https://github.com/can1357/oh-my-pi">can1357/oh-my-pi</a> — <a href="docs/fork-strategy.md">Two-Track Model</a>: keep <code>@oh-my-pi/*</code> internally for merge compatibility, publish <code>@pisces/*</code> externally
 </blockquote>
 
 ---
