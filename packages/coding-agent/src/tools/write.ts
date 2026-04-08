@@ -16,7 +16,7 @@ import { renderPromptTemplate } from "../config/prompt-templates";
 import type { RenderResultOptions } from "../extensibility/custom-tools/types";
 import { createLspWritethrough, type FileDiagnosticsResult, type WritethroughCallback, writethroughNoop } from "../lsp";
 import { getLanguageFromPath, type Theme } from "../modes/theme/theme";
-import { stripHashlinePrefixes } from "../patch";
+import { stripHashlinePrefixes, stripTokenLeakPrefixes } from "../patch";
 import writeDescription from "../prompts/tools/write.md" with { type: "text" };
 import type { ToolSession } from "../sdk";
 import { Ellipsis, Hasher, type RenderCache, renderStatusLine, truncateToWidth } from "../tui";
@@ -73,13 +73,27 @@ function getLspBatchRequest(toolCall: ToolCallContext | undefined): { id: string
  * prefixes in read output and sometimes copies them into write content.
  */
 function stripWriteContent(session: ToolSession, content: string): { text: string; stripped: boolean } {
-	if (!resolveFileDisplayMode(session).hashLines) {
-		return { text: content, stripped: false };
+	let lines = content.split("\n");
+	let stripped = false;
+
+	// Strip token boundary leak prefixes regardless of hashline mode
+	const tokenCleaned = stripTokenLeakPrefixes(lines);
+	if (tokenCleaned !== lines) {
+		lines = tokenCleaned;
+		stripped = true;
 	}
-	const lines = content.split("\n");
-	const cleaned = stripHashlinePrefixes(lines);
-	if (cleaned === lines) return { text: content, stripped: false };
-	return { text: cleaned.join("\n"), stripped: true };
+
+	// Also strip hashline prefixes if hashline mode is enabled
+	if (resolveFileDisplayMode(session).hashLines) {
+		const hashCleaned = stripHashlinePrefixes(lines);
+		if (hashCleaned !== lines) {
+			lines = hashCleaned;
+			stripped = true;
+		}
+	}
+
+	if (!stripped) return { text: content, stripped: false };
+	return { text: lines.join("\n"), stripped: true };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

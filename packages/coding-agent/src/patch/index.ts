@@ -107,6 +107,9 @@ const HASHLINE_PREFIX_PLUS_RE = /^\s*(?:>>>|>>)?\s*\+\s*(?:\d+\s*#\s*|#\s*)?[ZPM
 /** Pattern matching a unified-diff added-line `+` prefix (but not `++`). Does NOT match `-` to avoid corrupting Markdown list items. */
 const DIFF_PLUS_RE = /^[+](?![+])/;
 
+/** Pattern matching bare 2-char uppercase prefixes at line start (token boundary leak markers). */
+const TOKEN_LEAK_PREFIX_RE = /^[A-Z]{2}:\s/;
+
 /**
  * Strip hashline display prefixes and diff `+` markers from replacement lines.
  *
@@ -165,13 +168,36 @@ export function stripHashlinePrefixes(lines: string[]): string[] {
 	return lines.map(l => l.replace(HASHLINE_PREFIX_RE, ""));
 }
 
+/**
+ * Strip token boundary leak prefixes from lines.
+ *
+ * Only active when ALL non-empty lines carry the same 2-char uppercase prefix.
+ * This heuristic avoids stripping legitimate content that happens to start with two uppercase letters.
+ *
+ * Returns the original array reference when no stripping is needed.
+ */
+export function stripTokenLeakPrefixes(lines: string[]): string[] {
+	let prefixCount = 0;
+	let nonEmpty = 0;
+	for (const l of lines) {
+		if (l.length === 0) continue;
+		nonEmpty++;
+		if (TOKEN_LEAK_PREFIX_RE.test(l)) prefixCount++;
+	}
+	if (nonEmpty === 0 || prefixCount !== nonEmpty) return lines;
+	return lines.map(l => l.replace(TOKEN_LEAK_PREFIX_RE, ""));
+}
+
 export function hashlineParseText(edit: string[] | string | null): string[] {
 	if (edit === null) return [];
 	if (typeof edit === "string") {
 		const normalizedEdit = edit.endsWith("\n") ? edit.slice(0, -1) : edit;
 		edit = normalizedEdit.replaceAll("\r", "").split("\n");
 	}
-	return stripNewLinePrefixes(edit);
+	let lines = stripNewLinePrefixes(edit);
+	// Also strip token boundary leak prefixes from edit content
+	lines = stripTokenLeakPrefixes(lines);
+	return lines;
 }
 
 const linesSchema = Type.Union([
