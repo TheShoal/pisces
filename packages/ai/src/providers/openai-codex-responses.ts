@@ -13,6 +13,7 @@ import type {
 import packageJson from "../../package.json" with { type: "json" };
 import { calculateCost } from "../models";
 import { isUsageLimitError } from "../rate-limit-utils";
+import { sanitizeStreamingDelta } from "../sanitize-streaming-delta";
 import { getEnvApiKey } from "../stream";
 import {
 	type Api,
@@ -929,7 +930,8 @@ function handleToolCallArgumentsDelta(
 	blockIndex: () => number,
 ): void {
 	if (currentItem?.type !== "function_call" || currentBlock?.type !== "toolCall") return;
-	const delta = (rawEvent as { delta?: string }).delta || "";
+	const rawDelta = (rawEvent as { delta?: string }).delta || "";
+	const delta = sanitizeStreamingDelta(rawDelta);
 	currentBlock.partialJson += delta;
 	currentBlock.arguments = parseStreamingJson(currentBlock.partialJson);
 	stream.push({ type: "toolcall_delta", contentIndex: blockIndex(), delta, partial: output });

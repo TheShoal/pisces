@@ -10,6 +10,7 @@ import type {
 import { $env, abortableSleep, isEnoent } from "@oh-my-pi/pi-utils";
 import { mapEffortToAnthropicAdaptiveEffort } from "../model-thinking";
 import { calculateCost } from "../models";
+import { sanitizeStreamingDelta } from "../sanitize-streaming-delta";
 import { getEnvApiKey, OUTPUT_FALLBACK_BUFFER } from "../stream";
 import type {
 	Api,
@@ -796,12 +797,13 @@ export const streamAnthropic: StreamFunction<"anthropic-messages"> = (
 								const index = blocks.findIndex(b => b.index === event.index);
 								const block = blocks[index];
 								if (block && block.type === "toolCall") {
-									block.partialJson += event.delta.partial_json;
+									const sanitizedDelta = sanitizeStreamingDelta(event.delta.partial_json);
+									block.partialJson += sanitizedDelta;
 									block.arguments = parseStreamingJson(block.partialJson);
 									stream.push({
 										type: "toolcall_delta",
 										contentIndex: index,
-										delta: event.delta.partial_json,
+										delta: sanitizedDelta,
 										partial: output,
 									});
 								}

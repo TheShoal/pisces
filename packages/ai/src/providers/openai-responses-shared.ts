@@ -10,6 +10,7 @@ import type {
 	ResponseReasoningItem,
 } from "openai/resources/responses/responses";
 import { calculateCost } from "../models";
+import { sanitizeStreamingDelta } from "../sanitize-streaming-delta";
 import type {
 	Api,
 	AssistantMessage,
@@ -341,12 +342,13 @@ export async function processResponsesStream<TApi extends Api>(
 			}
 		} else if (event.type === "response.function_call_arguments.delta") {
 			if (currentItem?.type === "function_call" && currentBlock?.type === "toolCall") {
-				currentBlock.partialJson += event.delta;
+				const sanitizedDelta = sanitizeStreamingDelta(event.delta);
+				currentBlock.partialJson += sanitizedDelta;
 				currentBlock.arguments = parseStreamingJson(currentBlock.partialJson);
 				stream.push({
 					type: "toolcall_delta",
 					contentIndex: blockIndex(),
-					delta: event.delta,
+					delta: sanitizedDelta,
 					partial: output,
 				});
 			}
